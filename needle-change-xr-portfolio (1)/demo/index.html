@@ -1,0 +1,1357 @@
+<title>Needle Change XR</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: full-bleed WebGL scene; a small dark HUD card top-left and a help strip bottom-left. Single dark look (matches the in-headset panels). */
+:root {
+  --ink: #0F172A;        /* panel */
+  --ink-2: #1E293B;      /* surface */
+  --line: #334155;       /* border */
+  --text: #F8FAFC;
+  --text-2: #CBD5E1;
+  --text-3: #94A3B8;
+  --teal: #1E7C7B;       /* primary */
+  --teal-2: #2CA8A4;     /* accent */
+  --focus: #94F4EE;
+  --font: "Poppins", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: #DDE5EC; color: var(--text); font-family: var(--font); overflow: hidden; }
+#stage { position: fixed; inset: 0; }
+#stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.hud {
+  position: fixed; z-index: 5;
+  top: calc(16px + env(safe-area-inset-top, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px));
+  max-width: min(420px, calc(100vw - 32px));
+  background: color-mix(in srgb, var(--ink) 94%, transparent);
+  border: 1px solid rgb(255 255 255 / 0.12); border-radius: 18px;
+  padding: 14px 16px; display: grid; gap: 10px;
+  box-shadow: 0 10px 30px rgb(2 6 23 / 0.25);
+}
+.hud h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: 0.01em; text-wrap: balance; }
+.hud-head { display: flex; align-items: center; gap: 12px; }
+.hud-title { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.hud-sub { font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hud-toggle {
+  flex: none; width: 36px; height: 36px; border-radius: 999px; display: grid; place-items: center; cursor: pointer;
+  background: var(--ink-2); border: 1px solid var(--line); color: var(--text-2); padding: 0;
+}
+.hud-toggle:hover { border-color: var(--teal-2); color: var(--text); }
+.hud-toggle:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.hud-toggle svg { transition: transform 0.2s ease; }
+.hud[data-collapsed="true"] .hud-toggle svg { transform: rotate(-90deg); }
+.hud-body { display: grid; gap: 10px; }
+.hud[data-collapsed="true"] { padding-block: 10px; }
+.hud[data-collapsed="true"] .hud-body { display: none; }
+.hud p { margin: 0; font-size: 13px; color: var(--text-3); line-height: 1.45; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn {
+  font: 600 13px/1 var(--font); color: var(--text); cursor: pointer;
+  background: var(--ink-2); border: 1px solid var(--line); border-radius: 999px; padding: 9px 14px;
+}
+.btn:hover { border-color: var(--teal-2); }
+.btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.btn[aria-pressed="true"] { background: var(--teal); border-color: var(--teal-2); }
+.help {
+  position: fixed; z-index: 5;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  left: max(16px, env(safe-area-inset-left, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-wrap: wrap; gap: 8px; pointer-events: none;
+}
+.chip {
+  font-size: 12px; color: var(--text-2); background: color-mix(in srgb, var(--ink) 88%, transparent);
+  border: 1px solid rgb(255 255 255 / 0.1); border-radius: 999px; padding: 6px 12px;
+}
+.chip b { color: var(--text); font-weight: 600; }
+#vr-slot button { position: static !important; transform: none !important; left: auto !important; bottom: auto !important;
+  font: 600 13px/1 var(--font) !important; padding: 9px 14px !important; border-radius: 999px !important;
+  border: 1px solid var(--teal-2) !important; background: var(--teal) !important; color: var(--text) !important; opacity: 1 !important; width: auto !important; }
+#loading { position: fixed; inset: 0; display: grid; place-items: center; z-index: 4; color: #334155; font: 500 15px var(--font); }
+@media (max-width: 520px) { .hud p.long { display: none; } }
+@media (prefers-reduced-motion: reduce) { .btn, .hud-toggle svg { transition: none; } }
+</style>
+
+<div id="stage"></div>
+<div id="loading">Loading the cleanroom…</div>
+<div class="hud" id="hud" role="region" aria-label="Prototype controls" data-collapsed="false">
+  <div class="hud-head">
+    <div class="hud-title">
+      <h1>Needle Change XR</h1>
+      <span class="hud-sub" id="hud-sub">Flow 1 · Gowning</span>
+    </div>
+    <button class="hud-toggle" id="hud-toggle" type="button" aria-expanded="true" aria-controls="hud-body" aria-label="Collapse controls" title="Collapse controls">
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+  <div class="hud-body" id="hud-body">
+  <p class="long">Aseptic RABS training: flow 1 gowning and entry check, then flow 3 filling needle replacement. Floating panels follow the task; glowing rings mark what to touch.</p>
+  <div class="row" role="group" aria-label="Choose a flow">
+    <button class="btn" id="btn-flow1" aria-pressed="true">Flow 1 · Gowning</button>
+    <button class="btn" id="btn-flow3" aria-pressed="false">Flow 3 · Needle change</button>
+  </div>
+  <div class="row">
+    <button class="btn" id="btn-auto" aria-pressed="false">Auto-play</button>
+    <button class="btn" id="btn-assess" aria-pressed="false">Assessment mode</button>
+    <button class="btn" id="btn-restart">Restart</button>
+    <span id="vr-slot"></span>
+  </div>
+  </div>
+</div>
+<script>
+// Collapsible controls card: remembers the viewer's choice; starts folded on phone-width screens.
+(() => {
+  const hud = document.getElementById('hud'), btn = document.getElementById('hud-toggle');
+  const set = collapsed => {
+    hud.dataset.collapsed = String(collapsed);
+    btn.setAttribute('aria-expanded', String(!collapsed));
+    const label = collapsed ? 'Expand controls' : 'Collapse controls';
+    btn.setAttribute('aria-label', label); btn.title = label;
+  };
+  let saved = null;
+  try { saved = localStorage.getItem('nc-xr-hud-collapsed'); } catch (_) {}
+  set(saved === null ? matchMedia('(max-width: 520px)').matches : saved === 'true');
+  btn.addEventListener('click', () => {
+    const next = hud.dataset.collapsed !== 'true'; set(next);
+    try { localStorage.setItem('nc-xr-hud-collapsed', String(next)); } catch (_) {}
+  });
+})();
+</script>
+<div class="help" aria-hidden="true">
+  <span class="chip"><b>Drag</b> to look · <b>Scroll</b> to zoom · <b>Click</b> glowing parts and buttons</span>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { VRButton } from 'three/addons/webxr/VRButton.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+
+// ------------------------------------------------------------------ tokens (from the Figma UI kit)
+const C = {
+  panel: '#0F172A', surface: '#1E293B', border: '#334155', borderStrong: '#475569',
+  text1: '#F8FAFC', text2: '#CBD5E1', text3: '#94A3B8',
+  primary: '#1E7C7B', primaryHover: '#23918F', accent: '#2CA8A4', focus: '#94F4EE',
+  success: '#22C55E', warning: '#F97316', error: '#F87171',
+};
+const FONT = 'Poppins, system-ui, sans-serif';
+const toneColor = t => ({ warn: C.warning, error: C.error, success: C.success })[t] || C.focus;
+
+// ------------------------------------------------------------------ flow 3 data (DT_Flow3Steps + ST_Flow3)
+const PHASES = ['Prepare', 'Remove old', 'Fit new', 'Close down'];
+const SHORT = ['Go to zone', 'Sanitize hands', 'Open doors', 'Sanitize again', 'Undock needle', 'Unlock and remove', 'Sanitize hands', 'Pick sterile needle', 'Dock needle', 'Lock screw', 'Return cover', 'Sanitize hands', 'Close doors'];
+const SAN_HINT = 'Hold both grips and rub your hands together';
+const SAN_NUDGE = 'You still need to sanitize your hands. It keeps the area aseptic.';
+const ROWS = [
+  { n: 1, ph: 0, c: 'EnterVolume', t: 'FloorZone', i: 'Go to the highlighted area to start the needle replacement.', h: 'Walk, or push the thumbstick to move', nu: 'You’re not in the highlighted area yet. Follow the floor ring.', why: 'Every part you need is within reach of the floor ring, so you only walk once.' },
+  { n: 2, ph: 0, c: 'Sanitize', t: 'Sanitizer', show: 1, i: 'Sanitize your hands before you continue.', d: 'Rub every surface of both hands until they’re dry.', h: SAN_HINT, nu: SAN_NUDGE, done: 'Hands sanitized', why: 'Hands carry most contamination into a clean area. Rub until dry.' },
+  { n: 3, ph: 0, c: 'PullHandles', t: 'DoorHandles', i: 'Grip each handle and pull gently outward to open the doors.', h: 'Grip a handle, then pull toward you', done: 'Doors open', why: 'Pull gently and steadily so you don’t disturb the airflow inside the RABS.' },
+  { n: 4, ph: 0, c: 'Sanitize', t: 'Sanitizer', show: 1, i: 'Sanitize your hands again before you touch sterile parts.', d: 'Critical step: the doors are open and sterile parts are exposed.', h: SAN_HINT, nu: 'This is a critical step. Sanitize again before you handle sterile parts.', done: 'Hands sanitized', why: 'The doors are open and sterile parts are exposed, so this is the most critical sanitization.' },
+  { n: 5, ph: 1, c: 'PressButton', t: 'HMIStart', i: 'Press Start on the HMI to undock the needle.', h: 'Point at the button and pull the trigger', done: 'Undocking started', why: 'The HMI moves the needle cover out of the way so the old needle can be removed.' },
+  { n: 5, ph: 1, c: 'WaitForMachine', t: 'NeedleCover', v: 3.5, i: 'Lowering the needle cover…', d: 'Keep your hands clear until it stops.', done: 'Cover lowered', e: 'Wait until the cover is fully lowered.', ed: 'Reaching in while it moves can damage the needle or your glove.', why: 'Reaching in while the cover moves can damage the needle or tear your glove.' },
+  { n: 6, ph: 1, c: 'RotateComponent', t: 'NeedleBase', dir: -1, show: 1, i: 'Grip the base and turn it counter-clockwise to unlock the needle.', h: 'Grip the base, then twist your wrist left', done: 'Needle unlocked', e: 'Not quite. Watch the demo, then try again.', ed: 'Turn counter-clockwise, about a quarter turn, until it clicks.', why: 'A quarter turn counter-clockwise releases the needle. It clicks when it’s free.' },
+  { n: 6, ph: 1, c: 'PlaceOnTarget', t: 'Tray', i: 'Place the old needle on the tray.', h: 'Keep holding grip, release over the tray', done: 'Old needle on tray', why: 'Used needles go on the tray, never back on the line.' },
+  { n: 7, ph: 2, c: 'Sanitize', t: 'Sanitizer', show: 1, i: 'Sanitize your hands before you handle the new needle.', h: SAN_HINT, nu: SAN_NUDGE, done: 'Hands sanitized', why: 'Your hands touched the used needle. Sanitize before touching anything sterile.' },
+  { n: 8, ph: 2, c: 'PickItem', t: 'SterileNeedle', i: 'Take the sterile needle from the packet on the far right.', h: 'Reach in and squeeze grip to pick up', done: 'Sterile needle picked', e: 'That item isn’t sterile.', ed: 'Put it back and take the needle from the packet on the far right.', why: 'Only the far-right packet holds the sterile needle.' },
+  { n: 9, ph: 2, c: 'DockItem', t: 'DockingStation', show: 1, i: 'Line the needle up with the docking station and push it in gently.', h: 'Hold grip and move the needle down the guide', done: 'Needle docked', e: 'Not aligned yet.', ed: 'Move the needle onto the guide, then push in gently.', why: 'Line it up with the guide so it seats cleanly in the docking station.' },
+  { n: 10, ph: 2, c: 'RotateComponent', t: 'LockScrew', dir: 1, show: 1, i: 'Turn the screw clockwise to lock the needle.', h: 'Grip the screw, then twist your wrist right', done: 'Needle locked', e: 'The needle isn’t fully locked.', ed: 'Keep turning clockwise until you feel the click.', why: 'Keep turning until it clicks so the needle is fully locked.' },
+  { n: 11, ph: 3, c: 'MoveComponent', t: 'NeedleCover', i: 'Move the hydraulic cover back into place.', d: 'This protects the new needle from contamination.', h: 'Grip the cover and move it back up', done: 'Cover back in place', why: 'The cover protects the new needle until the line restarts.' },
+  { n: 12, ph: 3, c: 'Sanitize', t: 'Sanitizer', show: 1, i: 'Sanitize your hands before you leave this area.', h: SAN_HINT, nu: SAN_NUDGE, done: 'Hands sanitized', why: 'Sanitize before you leave so you don’t carry residue out of the area.' },
+  { n: 13, ph: 3, c: 'PushHandles', t: 'DoorHandles', i: 'Push each handle gently inward to close the doors.', h: 'Grip a handle, then push away from you', done: 'Doors closed', why: 'Close both doors to restore the RABS barrier.' },
+];
+const TAG_LABEL = { FloorZone: 'Stand here', Sanitizer: 'Sanitizer', DoorHandles: 'Handle', HMIStart: 'Start button', NeedleCover: 'Needle cover', NeedleBase: 'Needle base', Tray: 'Tray', SterileNeedle: 'Sterile needle', DockingStation: 'Docking station', LockScrew: 'Locking screw' };
+const IDLE_SECONDS = 20; // 60 s in the real build; shortened for the prototype
+
+// ------------------------------------------------------------------ flow 1 data (Figma gowning screens + copy deck)
+// Donning order follows the redesign; confirm it against the site SOP.
+const GOWN = [
+  { key: 'hair', name: 'Hair cover', why: 'Keeps hair and skin flakes out of the clean area.', when: 'The hair cover goes on first, before anything touches your face or gown.' },
+  { key: 'mask', name: 'Face mask', why: 'Stops breath and droplets from reaching the product.', when: 'The face mask goes on right after the hair cover.' },
+  { key: 'gown', name: 'Gown or coverall', why: 'Stops particles shed from your body and clothes from entering the area.', when: 'The gown goes on once your hair and face are covered.' },
+  { key: 'shoes', name: 'Shoe covers', why: 'Keeps dirt and particles from the floor out of the clean area.', when: 'Shoe covers go on after the gown.' },
+  { key: 'eyes', name: 'Eye protection', why: 'Contains particles from your face and protects your eyes from splashes.', when: 'Eye protection goes on after the shoe covers.' },
+  { key: 'gloves', name: 'Sterile gloves', why: 'Protect the product from contaminants on your hands. Put them on last to keep them sterile.', when: 'Sterile gloves go on last, so they stay sterile.' },
+];
+const BENCH_ORDER = ['gloves', 'gown', 'hair', 'eyes', 'shoes', 'mask']; // shuffled on the bench
+const ORD = ['first', 'second', 'third', 'fourth', 'fifth', 'last'];
+
+// ------------------------------------------------------------------ renderer + scene
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.xr.enabled = true;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#DCE4EB');
+scene.fog = new THREE.Fog('#DCE4EB', 7, 16);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.02, 50);
+const rig = new THREE.Group(); // moves the VR player; desktop camera stays outside it
+scene.add(rig);
+const START_CAM = new THREE.Vector3(0, 1.62, 3.1), START_LOOK = new THREE.Vector3(0, 1.3, -1.2);
+// desktop camera stands back a little so the side panels stay in view; in VR the player stands in the ring itself
+const STAND_CAM = new THREE.Vector3(0, 1.62, 1.45), STAND_LOOK = new THREE.Vector3(0, 1.2, -1.6);
+const VR_STAND_Z = 0.45;
+// flow 1 happens in the gowning area on the left, facing the bench (looking toward -x)
+const GOWN_CAM = new THREE.Vector3(-1.15, 1.62, 1.6), GOWN_LOOK = new THREE.Vector3(-3.4, 1.15, 1.6);
+const BENCH_CENTER = new THREE.Vector3(-3.4, 1.0, 1.6);
+camera.position.copy(START_CAM);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.copy(START_LOOK);
+controls.enableDamping = true;
+controls.minDistance = 0.6; controls.maxDistance = 4.2;
+controls.minPolarAngle = 0.55; controls.maxPolarAngle = 1.75;
+controls.update();
+
+scene.add(new THREE.HemisphereLight('#FFFFFF', '#9FB0BF', 1.1));
+const sun = new THREE.DirectionalLight('#FFFFFF', 1.4);
+sun.position.set(2, 4, 3); scene.add(sun);
+
+// ------------------------------------------------------------------ materials
+const M = {
+  floor: new THREE.MeshStandardMaterial({ color: '#C9D3DC', roughness: 0.55, metalness: 0.05 }),
+  wall: new THREE.MeshStandardMaterial({ color: '#EEF3F6', roughness: 0.9 }),
+  wallTeal: new THREE.MeshStandardMaterial({ color: '#BFE4E1', roughness: 0.9 }),
+  steel: new THREE.MeshStandardMaterial({ color: '#C7CDD3', roughness: 0.32, metalness: 0.75 }),
+  darkSteel: new THREE.MeshStandardMaterial({ color: '#7A848E', roughness: 0.4, metalness: 0.7 }),
+  glass: new THREE.MeshStandardMaterial({ color: '#CFF3EF', roughness: 0.05, metalness: 0.0, transparent: true, opacity: 0.22, depthWrite: false }),
+  frame: new THREE.MeshStandardMaterial({ color: '#E7ECEF', roughness: 0.35, metalness: 0.4 }),
+  white: new THREE.MeshStandardMaterial({ color: '#F7F9FA', roughness: 0.7 }),
+  packet: new THREE.MeshStandardMaterial({ color: '#E8F1FB', roughness: 0.6 }),
+  packetBlue: new THREE.MeshStandardMaterial({ color: '#8FB7E8', roughness: 0.6 }),
+  hmi: new THREE.MeshStandardMaterial({ color: '#2B3440', roughness: 0.5, metalness: 0.3 }),
+  screen: new THREE.MeshBasicMaterial({ color: '#0E4A49' }),
+  green: new THREE.MeshStandardMaterial({ color: '#22C55E', roughness: 0.4, emissive: '#0A4D23', emissiveIntensity: 0.6 }),
+  needle: new THREE.MeshStandardMaterial({ color: '#E2E8F0', roughness: 0.2, metalness: 0.9 }),
+  orange: new THREE.MeshStandardMaterial({ color: '#E2774A', roughness: 0.5 }),
+};
+const box = (w, h, d, m) => new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, Math.min(w, h, d) * 0.12), m);
+const cyl = (r, h, m, seg = 24) => new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), m);
+
+// interactive objects: userData.tags = [...], userData.pickable = true
+const pickables = [];
+function pickable(obj, tags = []) {
+  obj.userData.tags = tags; obj.userData.pickable = true;
+  obj.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.userData.baseEmissive = o.material.emissive ? o.material.emissive.clone() : null; } });
+  pickables.push(obj); return obj;
+}
+
+// ------------------------------------------------------------------ room (sized for the Line 18 enclosure)
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), M.floor);
+floor.rotation.x = -Math.PI / 2; floor.position.z = -0.5; scene.add(floor);
+const grid = new THREE.GridHelper(14, 28, '#AEBBC6', '#BFCAD3'); grid.position.set(0, 0.002, -0.5); grid.material.opacity = 0.5; grid.material.transparent = true; scene.add(grid);
+const back = new THREE.Mesh(new THREE.PlaneGeometry(12.2, 3.4), M.wallTeal); back.position.set(0, 1.7, -5.8); scene.add(back);
+for (const s of [-1, 1]) { const w = new THREE.Mesh(new THREE.PlaneGeometry(11, 3.4), M.wall); w.position.set(6.1 * s, 1.7, -0.3); w.rotation.y = -s * Math.PI / 2; scene.add(w); }
+const gownWall = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 3.4), M.wall); gownWall.position.set(-4.2, 1.7, 1.6); gownWall.rotation.y = Math.PI / 2; scene.add(gownWall); // gowning room wall
+for (let i = 0; i < 6; i++) { const l = box(1.6, 0.05, 0.25, new THREE.MeshBasicMaterial({ color: '#FFFFFF' })); l.position.set(-3.4 + (i % 3) * 3.4, 3.35, -3.6 + Math.floor(i / 3) * 3.0); scene.add(l); }
+
+// ------------------------------------------------------------------ Line 18 RABS: converted from the Unity FBX models
+// models/line18-rabs.glb = FillingLine (LOD1) + Mod3 dosing + HMI + SFPI far-side doors/gloves + Line 18 enclosure,
+// merged per material, simplified with meshoptimizer and meshopt-compressed (about 290k -> 95k triangles, 9.6 MB -> 1 MB).
+const gltfLoader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+async function loadLine18() { // the .glb where it is served (local, headset); the same bytes as a JS module elsewhere
+  try { const r = await fetch('models/line18-rabs.glb'); if (r.ok) return await gltfLoader.parseAsync(await r.arrayBuffer(), ''); } catch (_) {}
+  const { default: b64 } = await import('./models/line18-rabs.glb.js');
+  const bin = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  return gltfLoader.parseAsync(bin.buffer, '');
+}
+const line18 = (await loadLine18()).scene;
+const part = n => line18.getObjectByName(n);
+const PM = { // PBR looks per part (the Unity atlas textures were not in the project)
+  FillingMachine: new THREE.MeshStandardMaterial({ color: '#DDE3E8', roughness: 0.3, metalness: 0.6 }),
+  NeedleArea: new THREE.MeshStandardMaterial({ color: '#E6EAEE', roughness: 0.26, metalness: 0.65 }),
+  DosingModule: new THREE.MeshStandardMaterial({ color: '#C8CFD6', roughness: 0.26, metalness: 0.8 }),
+  Steel: new THREE.MeshStandardMaterial({ color: '#BAC3CB', roughness: 0.34, metalness: 0.7 }),
+  Glass: new THREE.MeshStandardMaterial({ color: '#D3F2EE', roughness: 0.05, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide }),
+  Gloves: new THREE.MeshStandardMaterial({ color: '#E7E2D4', roughness: 0.85 }),
+  HMI_Body: new THREE.MeshStandardMaterial({ color: '#3A4450', roughness: 0.45, metalness: 0.5 }),
+  HMI_Dials: new THREE.MeshStandardMaterial({ color: '#14201F', roughness: 0.6 }),
+  HMI_Screen: new THREE.MeshBasicMaterial({ color: '#0E4A49', side: THREE.DoubleSide }),
+  HMI_StartButton: new THREE.MeshStandardMaterial({ color: '#22C55E', roughness: 0.4, emissive: '#0A4D23', emissiveIntensity: 0.8, side: THREE.DoubleSide }),
+};
+line18.traverse(o => { if (o.isMesh && PM[o.name]) o.material = PM[o.name]; });
+scene.add(line18);
+const RABS = new THREE.Group(); scene.add(RABS);
+// stainless base under the filling module (not part of the supplied FBX set)
+const base = box(3.0, 0.74, 2.3, M.steel); base.position.set(0, 0.37, -2.45); RABS.add(base);
+const kick = box(2.9, 0.1, 2.2, M.darkSteel); kick.position.set(0, 0.05, -2.43); RABS.add(kick);
+
+// operator doors: the supplied SFPI doors are modelled open, so these animated doors fill the real door bay
+const doors = [];
+const handles = [];
+const DOOR_OPEN = 1.0; // radians; wider would swing into the HMI arm
+for (const s of [-1, 1]) {
+  const hinge = new THREE.Group(); hinge.position.set(1.5 * s, 0.76, -1.3); RABS.add(hinge);
+  const pane = new THREE.Mesh(new THREE.PlaneGeometry(1.46, 1.66), M.glass); pane.position.set(-0.73 * s, 0.83, 0); hinge.add(pane);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.018, 10, 32), M.frame); rim.position.set(-0.78 * s, 0.6, 0.005); hinge.add(rim);
+  const glove = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.3, 6, 14), PM.Gloves); glove.rotation.x = 0.45; glove.position.set(-0.78 * s, 0.42, -0.1); hinge.add(glove); // hangs inside from the port
+  const frameV = box(0.035, 1.66, 0.035, M.frame); frameV.position.set(-1.44 * s, 0.83, 0); hinge.add(frameV);
+  const frameH = box(1.46, 0.035, 0.035, M.frame); frameH.position.set(-0.73 * s, 1.66, 0); hinge.add(frameH);
+  const kickPlate = box(1.46, 0.16, 0.02, M.steel); kickPlate.position.set(-0.73 * s, 0.08, 0); hinge.add(kickPlate);
+  const handle = new THREE.Group();
+  const bar = cyl(0.016, 0.24, M.steel); bar.position.set(0, 0, 0.06); handle.add(bar);
+  for (const y of [-0.1, 0.1]) { const arm = box(0.02, 0.02, 0.06, M.steel); arm.position.set(0, y, 0.03); handle.add(arm); }
+  handle.position.set(-1.34 * s, 0.62, 0); hinge.add(handle);
+  pickable(handle, ['DoorHandles']); handles.push(handle);
+  doors.push({ hinge, s });
+}
+
+// HMI: the real HMI model; its Start button is a separate node in the GLB
+const hmiBody = new THREE.Group(); scene.add(hmiBody);
+['HMI_Body', 'HMI_Dials', 'HMI_Screen'].forEach(n => { const m = part(n); if (m) hmiBody.add(m); });
+pickable(hmiBody, []);
+const startBtn = part('HMI_StartButton');
+const startGroup = new THREE.Group(); startGroup.add(startBtn); scene.add(startGroup); pickable(startGroup, ['HMIStart']);
+
+// needle on the real needle area: the trainee swaps one needle (procedural, so it can be unlocked, carried and docked)
+const naBox = new THREE.Box3().setFromObject(part('NeedleArea'));
+const naC = naBox.getCenter(new THREE.Vector3());
+const DOCK_POS = new THREE.Vector3(naC.x, naBox.min.y + 0.2, naBox.max.z - 0.08);
+const dock = new THREE.Group(); dock.position.copy(DOCK_POS); RABS.add(dock);
+const dockRing = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.008, 10, 32), M.steel); dockRing.rotation.x = Math.PI / 2; dock.add(dockRing);
+const dockPad = cyl(0.03, 0.01, M.hmi); dock.add(dockPad);
+pickable(dock, ['DockingStation']);
+function makeNeedle() { // points down from its mount, like the filling needles
+  const g = new THREE.Group();
+  const b = cyl(0.028, 0.04, M.orange); b.position.y = -0.02; g.add(b);
+  const n = cyl(0.004, 0.16, M.needle, 12); n.position.y = -0.12; g.add(n);
+  const k = cyl(0.012, 0.025, M.steel, 6); k.position.y = -0.05; g.add(k);
+  return g;
+}
+const oldNeedle = makeNeedle(); oldNeedle.position.copy(dock.position); RABS.add(oldNeedle); pickable(oldNeedle, ['NeedleBase']);
+// hydraulic needle cover: a small hood around the needle tip that drops into the base to give access
+const COVER_UP = DOCK_POS.clone().add(new THREE.Vector3(0, -0.13, 0)), COVER_DOWN = DOCK_POS.clone().add(new THREE.Vector3(0, -0.5, -0.25));
+const cover = box(0.16, 0.2, 0.16, M.frame); cover.position.copy(COVER_UP); RABS.add(cover); pickable(cover, ['NeedleCover']);
+
+// cart with tray and three needle packets, right of the door bay (clear of the door swing)
+const CART = new THREE.Group(); CART.position.set(2.45, 0, -0.65); scene.add(CART);
+const cartTop = box(0.82, 0.04, 0.55, M.steel); cartTop.position.y = 0.88; CART.add(cartTop);
+const cartShelf = box(0.82, 0.03, 0.55, M.steel); cartShelf.position.y = 0.35; CART.add(cartShelf);
+for (const x of [-0.38, 0.38]) for (const z of [-0.25, 0.25]) { const l = cyl(0.015, 0.88, M.steel, 10); l.position.set(x, 0.44, z); CART.add(l); }
+pickable(cartTop, []);
+const tray = box(0.34, 0.035, 0.18, M.darkSteel); tray.position.set(-0.18, 0.92, -0.14); CART.add(tray); pickable(tray, ['Tray']);
+const packets = [];
+for (let i = 0; i < 3; i++) {
+  const p = new THREE.Group(); p.position.set(-0.25 + i * 0.25, 0.915, 0.12); CART.add(p);
+  const env = box(0.16, 0.025, 0.24, i === 2 ? M.packetBlue : M.packet); p.add(env);
+  packets.push(p); pickable(p, i === 2 ? ['SterileNeedle'] : []);
+}
+const newNeedle = makeNeedle(); newNeedle.scale.setScalar(0.9); newNeedle.rotation.z = Math.PI / 2; newNeedle.position.set(0.01, 0.03, 0); packets[2].add(newNeedle);
+
+// sanitizer on a stand, front-right of the door bay
+const SAN = new THREE.Group(); SAN.position.set(1.85, 0, 0.3); scene.add(SAN);
+const sp = cyl(0.025, 1.05, M.steel); sp.position.y = 0.53; SAN.add(sp);
+const sfoot = cyl(0.15, 0.03, M.darkSteel); sfoot.position.y = 0.015; SAN.add(sfoot);
+const dispenser = new THREE.Group(); dispenser.position.y = 1.15; SAN.add(dispenser);
+const dbody = box(0.14, 0.26, 0.11, M.white); dispenser.add(dbody);
+const dlabel = box(0.1, 0.07, 0.005, new THREE.MeshStandardMaterial({ color: '#2CA8A4' })); dlabel.position.set(0, 0.04, 0.057); dispenser.add(dlabel);
+const nozzle = box(0.05, 0.03, 0.06, M.darkSteel); nozzle.position.set(0, -0.14, 0.03); dispenser.add(nozzle);
+dispenser.rotation.y = -1.0;
+pickable(dispenser, ['Sanitizer']);
+
+// floor ring (the zone), outside the door swing
+const zone = new THREE.Group(); zone.position.set(0, 0.006, 0.45); scene.add(zone);
+const zoneDisk = new THREE.Mesh(new THREE.CircleGeometry(0.46, 48), new THREE.MeshBasicMaterial({ color: '#94F4EE', transparent: true, opacity: 0.12, depthWrite: false }));
+zoneDisk.rotation.x = -Math.PI / 2; zone.add(zoneDisk);
+const zoneRing = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.46, 64), new THREE.MeshBasicMaterial({ color: '#2CA8A4', transparent: true, opacity: 0.85, depthWrite: false }));
+zoneRing.rotation.x = -Math.PI / 2; zone.add(zoneRing);
+pickable(zone, ['FloorZone']);
+
+// ------------------------------------------------------------------ gowning area (flow 1)
+const gownFloor = new THREE.Mesh(new THREE.PlaneGeometry(2.9, 2.6), new THREE.MeshStandardMaterial({ color: '#CFD9E2', roughness: 0.6 }));
+gownFloor.rotation.x = -Math.PI / 2; gownFloor.position.set(-2.75, 0.004, 1.6); scene.add(gownFloor);
+const bench = new THREE.Group(); bench.position.set(-3.45, 0, 1.6); scene.add(bench);
+const benchTop = box(0.55, 0.05, 2.0, M.steel); benchTop.position.y = 0.885; bench.add(benchTop);
+for (const z of [-0.92, 0.92]) for (const x of [-0.22, 0.22]) { const l = cyl(0.018, 0.86, M.steel, 10); l.position.set(x, 0.43, z); bench.add(l); }
+const benchShelf = box(0.52, 0.03, 1.9, M.steel); benchShelf.position.y = 0.3; bench.add(benchShelf);
+// wall sign
+(() => {
+  const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 256; const c = cv.getContext('2d');
+  c.fillStyle = '#0F172A'; c.beginPath(); c.roundRect(0, 0, 1024, 256, 48); c.fill();
+  c.fillStyle = '#2CA8A4'; c.fillRect(64, 70, 12, 116);
+  c.fillStyle = '#F8FAFC'; c.font = '600 84px Poppins, sans-serif'; c.fillText('Gowning room', 110, 150);
+  c.fillStyle = '#94A3B8'; c.font = '500 40px Poppins, sans-serif'; c.fillText('Gown in order before entering the RABS area', 112, 210);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.3), new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false }));
+  sign.position.set(-4.17, 2.05, 1.6); sign.rotation.y = Math.PI / 2; scene.add(sign);
+  sign.userData.redraw = () => { c.fillStyle = '#0F172A'; c.beginPath(); c.roundRect(0, 0, 1024, 256, 48); c.fill(); c.fillStyle = '#2CA8A4'; c.fillRect(64, 70, 12, 116); c.fillStyle = '#F8FAFC'; c.font = '600 84px Poppins, sans-serif'; c.fillText('Gowning room', 110, 150); c.fillStyle = '#94A3B8'; c.font = '500 40px Poppins, sans-serif'; c.fillText('Gown in order before entering the RABS area', 112, 210); tex.needsUpdate = true; };
+  document.fonts?.ready.then(() => sign.userData.redraw());
+})();
+// the six gowning items, simple stand-ins for the real models
+const GM = {
+  blue: new THREE.MeshStandardMaterial({ color: '#CFE3F7', roughness: 0.75 }),
+  midBlue: new THREE.MeshStandardMaterial({ color: '#9CC3E6', roughness: 0.7 }),
+  white: new THREE.MeshStandardMaterial({ color: '#F4F6F8', roughness: 0.8 }),
+  teal: new THREE.MeshStandardMaterial({ color: '#2CA8A4', roughness: 0.6 }),
+  lens: new THREE.MeshStandardMaterial({ color: '#BDEDEA', roughness: 0.1, transparent: true, opacity: 0.6 }),
+};
+function makeGownItem(key) { // detailed procedural stand-ins; local origin = bench surface
+  const g = new THREE.Group();
+  const nonwoven = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
+  const tube = (pts, r, mat, closed = false, seg = 64) => new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, closed), seg, r, 8, closed), mat);
+  const ring = (rad, y, wave, amp, n = 96) => { const p = []; for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; const r = rad + Math.sin(a * wave) * amp; p.push(new THREE.Vector3(Math.cos(a) * r, y + Math.cos(a * wave) * amp * 0.5, Math.sin(a) * r)); } return p; };
+  if (key === 'hair') { // bouffant cap: gathered dome + ruffled elastic edge
+    const mat = nonwoven('#CFE3F7');
+    const prof = []; for (let i = 0; i <= 16; i++) { const t = i / 16; prof.push(new THREE.Vector2(0.085 * Math.sin(t * Math.PI / 2) + 0.004 * Math.sin(t * 40), 0.055 * Math.cos(t * Math.PI / 2) + 0.012)); }
+    const dome = new THREE.Mesh(new THREE.LatheGeometry(prof.reverse(), 48), mat);
+    const pos = dome.geometry.attributes.position; // soft gathers
+    for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), z = pos.getZ(i), a = Math.atan2(z, x), k = 1 + 0.035 * Math.sin(a * 14); pos.setXYZ(i, x * k, pos.getY(i), z * k); }
+    dome.geometry.computeVertexNormals(); g.add(dome);
+    g.add(tube(ring(0.088, 0.013, 18, 0.006), 0.007, nonwoven('#B7D3EE'), true, 160));
+  } else if (key === 'mask') { // curved 3-ply mask with pleats, nose wire and ear loops
+    const geo = new THREE.PlaneGeometry(0.17, 0.09, 40, 24); const p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i); const z = 0.028 * Math.cos(x / 0.17 * Math.PI) + 0.0035 * Math.sin(y / 0.09 * Math.PI * 6) * (1 - Math.abs(x) / 0.1); p.setXYZ(i, x, y, z); }
+    geo.computeVertexNormals();
+    const mask = new THREE.Mesh(geo, nonwoven('#BFDDF5')); mask.rotation.x = -Math.PI / 2; mask.position.y = 0.006; g.add(mask);
+    const back = new THREE.Mesh(geo, nonwoven('#F3F6F8')); back.rotation.x = -Math.PI / 2; back.position.y = 0.004; g.add(back);
+    const wire = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.003, 0.006), new THREE.MeshStandardMaterial({ color: '#E8EEF2', roughness: 0.4, metalness: 0.5 })); wire.position.set(0, 0.034, -0.04); g.add(wire);
+    for (const s of [-1, 1]) g.add(tube([new THREE.Vector3(0.085 * s, 0.03, -0.035), new THREE.Vector3(0.125 * s, 0.012, -0.03), new THREE.Vector3(0.13 * s, 0.006, 0.01), new THREE.Vector3(0.12 * s, 0.01, 0.04), new THREE.Vector3(0.085 * s, 0.03, 0.035)], 0.0018, nonwoven('#FFFFFF')));
+  } else if (key === 'gown') { // folded coverall: stacked folds, collar, zip tape, folded sleeve
+    const white = nonwoven('#F2F4F6'), shade = nonwoven('#E3E8EC');
+    const fold = (w, h, d, y, m) => { const b = box(w, h, d, m); b.position.y = y; g.add(b); return b; };
+    fold(0.25, 0.022, 0.2, 0.011, white); fold(0.245, 0.02, 0.195, 0.032, shade); fold(0.24, 0.02, 0.19, 0.052, white);
+    const zip = box(0.012, 0.004, 0.17, new THREE.MeshStandardMaterial({ color: '#2CA8A4', roughness: 0.5 })); zip.position.set(0.02, 0.064, 0); g.add(zip);
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.008, 8, 24, Math.PI), white); collar.rotation.x = -Math.PI / 2; collar.position.set(0.02, 0.064, -0.085); g.add(collar);
+    const sleeve = new THREE.Mesh(new THREE.CapsuleGeometry(0.016, 0.16, 4, 10), shade); sleeve.rotation.set(0, 0.25, Math.PI / 2); sleeve.position.set(-0.03, 0.066, 0.045); g.add(sleeve);
+    const label = box(0.05, 0.002, 0.03, nonwoven('#9CC3E6')); label.position.set(-0.08, 0.063, -0.06); g.add(label);
+  } else if (key === 'shoes') { // pair of booties with elastic opening
+    const mat = nonwoven('#9CC3E6'), elastic = nonwoven('#7FAEDB');
+    for (const s of [-1, 1]) {
+      const shoe = new THREE.Group(); shoe.position.set(0.058 * s, 0, 0); shoe.rotation.y = 0.12 * s;
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.05, 32, 18), mat); body.scale.set(0.85, 0.5, 2.0); body.position.y = 0.024;
+      const p = body.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); if (y < 0) p.setY(i, y * 0.35); p.setX(i, p.getX(i) * (1 + 0.04 * Math.sin(p.getZ(i) * 180))); }
+      body.geometry.computeVertexNormals(); shoe.add(body);
+      const open = tube(ring(0.026, 0, 10, 0.003, 64), 0.004, elastic, true, 96); open.scale.set(1, 1, 1.5); open.position.set(0, 0.046, -0.03); shoe.add(open);
+      g.add(shoe);
+    }
+  } else if (key === 'eyes') { // wraparound safety goggles: curved visor, vents, strap
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.05, 40, 1, true, -Math.PI * 0.42, Math.PI * 0.84), new THREE.MeshStandardMaterial({ color: '#8FD3CC', roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.5, side: THREE.DoubleSide }));
+    lens.position.set(0, 0.03, -0.05); g.add(lens);
+    const frameMat = new THREE.MeshStandardMaterial({ color: '#5B7C99', roughness: 0.5 });
+    for (const y of [0.005, 0.055]) { const pts = []; for (let i = 0; i <= 24; i++) { const a = -Math.PI * 0.42 + i / 24 * Math.PI * 0.84; pts.push(new THREE.Vector3(Math.sin(a) * 0.076, y, Math.cos(a) * 0.076 - 0.05)); } g.add(tube(pts, 0.004, frameMat)); }
+    const bridge = box(0.022, 0.016, 0.01, frameMat); bridge.position.set(0, 0.012, 0.028); g.add(bridge);
+    for (const s of [-1, 1]) { const vent = box(0.012, 0.004, 0.02, frameMat); vent.position.set(0.045 * s, 0.057, 0.008); g.add(vent); }
+    g.add(tube([new THREE.Vector3(-0.07, 0.03, -0.02), new THREE.Vector3(-0.06, 0.006, -0.1), new THREE.Vector3(0, 0.003, -0.13), new THREE.Vector3(0.06, 0.006, -0.1), new THREE.Vector3(0.07, 0.03, -0.02)], 0.006, new THREE.MeshStandardMaterial({ color: '#2CA8A4', roughness: 0.7 })));
+  } else if (key === 'gloves') { // sterile glove pack: peel pouch with a folded pair inside
+    const pouch = box(0.15, 0.012, 0.24, new THREE.MeshPhysicalMaterial({ color: '#F4F8FB', roughness: 0.3, transmission: 0.35, transparent: true, opacity: 0.85 })); pouch.position.y = 0.006; g.add(pouch);
+    const peel = box(0.15, 0.013, 0.025, new THREE.MeshStandardMaterial({ color: '#2CA8A4', roughness: 0.6 })); peel.position.set(0, 0.007, -0.105); g.add(peel);
+    const latex = new THREE.MeshStandardMaterial({ color: '#EADFC8', roughness: 0.55 });
+    for (const s of [-1, 1]) {
+      const hand = new THREE.Group(); hand.position.set(0.034 * s, 0.014, 0.01); hand.scale.setScalar(0.85);
+      const palm = box(0.05, 0.012, 0.06, latex); hand.add(palm);
+      for (let k = 0; k < 4; k++) { const f = new THREE.Mesh(new THREE.CapsuleGeometry(0.0065, 0.04 - Math.abs(k - 1.5) * 0.006, 4, 8), latex); f.rotation.x = Math.PI / 2; f.position.set(-0.018 + k * 0.012, 0, 0.055); hand.add(f); }
+      const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(0.007, 0.03, 4, 8), latex); thumb.rotation.set(Math.PI / 2, 0, 0.7 * s); thumb.position.set(0.032 * s, 0, 0.02); hand.add(thumb);
+      const cuff = box(0.054, 0.01, 0.06, latex); cuff.position.set(0, 0.002, -0.06); hand.add(cuff);
+      g.add(hand);
+    }
+    const label = box(0.07, 0.013, 0.03, new THREE.MeshStandardMaterial({ color: '#9CC3E6', roughness: 0.6 })); label.position.set(0, 0.008, -0.075); g.add(label);
+  }
+  return g;
+}
+const gownItems = BENCH_ORDER.map((key, k) => {
+  const item = makeGownItem(key);
+  const home = new THREE.Vector3(-3.38, 0.912, 0.92 + k * 0.27);
+  item.position.copy(home); item.rotation.y = Math.PI / 2;
+  item.userData.gownKey = key; item.userData.home = home.clone();
+  scene.add(item); pickable(item, ['Gown:' + key]);
+  return item;
+});
+
+// ------------------------------------------------------------------ canvas panels (the spatial UI)
+function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+function wrap(ctx, text, maxW) {
+  const out = []; for (const para of String(text).split('\n')) { let line = '';
+    for (const w of para.split(' ')) { const t = line ? line + ' ' + w : w; if (ctx.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t; }
+    out.push(line); } return out;
+}
+class Panel {
+  constructor(w, h, widthM, anchor = 'top') {
+    this.w = w; this.h = h; this.m = widthM / w;
+    this.cv = document.createElement('canvas'); this.cv.width = w * 2; this.cv.height = h * 2;
+    this.ctx = this.cv.getContext('2d'); this.ctx.scale(2, 2);
+    this.tex = new THREE.CanvasTexture(this.cv); this.tex.colorSpace = THREE.SRGBColorSpace; this.tex.anisotropy = 8;
+    const hm = widthM * h / w; const g = new THREE.PlaneGeometry(widthM, hm);
+    if (anchor === 'top') g.translate(0, -hm / 2, 0);
+    this.mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: this.tex, transparent: true, toneMapped: false, depthWrite: false }));
+    this.mesh.renderOrder = 10; this.mesh.userData.panel = this;
+    this.hits = []; this.bg = { x: 0, y: 0, w, h }; this.hover = null; this.draw = () => {};
+  }
+  begin() { if (this.nested) return; this.ctx.clearRect(0, 0, this.w, this.h); this.hits = []; }
+  end() { this.tex.needsUpdate = true; }
+  hitAt(uv) {
+    const x = uv.x * this.w, y = (1 - uv.y) * this.h, b = this.bg;
+    if (x < b.x || x > b.x + b.w || y < b.y || y > b.y + b.h) return null;
+    return this.hits.find(h => !h.disabled && x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) || { id: null };
+  }
+  surface(x, y, w, h, r, stroke = 'rgba(255,255,255,0.14)', lw = 1.5, fill = 'rgba(15,23,42,0.96)') {
+    if (this.nested) return;
+    const c = this.ctx; this.bg = { x, y, w, h };
+    c.save(); c.shadowColor = 'rgba(2,6,23,0.35)'; c.shadowBlur = 18; c.shadowOffsetY = 6;
+    rr(c, x + 1, y + 1, w - 2, h - 2, r); c.fillStyle = fill; c.fill(); c.restore();
+    rr(c, x + 1, y + 1, w - 2, h - 2, r); c.strokeStyle = stroke; c.lineWidth = lw; c.stroke();
+  }
+  button(id, x, y, w, label, variant = 'primary', disabled = false, h = 64) {
+    const c = this.ctx, hov = this.hover === id && !disabled;
+    rr(c, x, y, w, h, h / 2);
+    if (disabled) { c.fillStyle = C.border; c.fill(); }
+    else if (variant === 'primary') { c.fillStyle = hov ? C.primaryHover : C.primary; c.fill(); }
+    else { c.fillStyle = hov ? C.surface : 'rgba(0,0,0,0)'; c.fill(); c.strokeStyle = C.borderStrong; c.lineWidth = 2; c.stroke(); }
+    if (hov) { rr(c, x - 3, y - 3, w + 6, h + 6, h / 2 + 3); c.strokeStyle = C.focus; c.lineWidth = 3; c.stroke(); }
+    c.fillStyle = disabled ? C.text3 : C.text1; c.font = `600 ${h > 56 ? 22 : 18}px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText(label, x + w / 2, y + h / 2 + 1); c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+    this.hits.push({ id, x, y: y + (this.oy || 0), w, h, disabled });
+  }
+}
+
+// --- task panel (design px 900 wide)
+const TW = 760; // task card width in design px
+const task = new Panel(TW, 470, 0.52);
+const taskGroup = new THREE.Group(); taskGroup.add(task.mesh); scene.add(taskGroup);
+// toast and hint are drawn inside the task card now; the hint panel only appears on the left wrist in VR
+const toast = new Panel(560, 64, 0.373); toast.mesh.visible = false;
+const hint = new Panel(720, 76, 0.48); hint.mesh.visible = false;
+taskGroup.add(toast.mesh); taskGroup.add(hint.mesh);
+// Steps / Help menu: one panel at a time, docked to the right of the task card, opened from its Menu button
+const MENU_H = 804;
+const proc = new Panel(520, MENU_H, 0.44);
+const help = new Panel(520, MENU_H, 0.44);
+for (const m of [proc.mesh, help.mesh]) { m.visible = false; m.position.set(0.26 + 0.03 + 0.22, 0, 0.03); m.rotation.y = -0.32; taskGroup.add(m); }
+const panels = [task, toast, hint, proc, help];
+
+// ------------------------------------------------------------------ state
+// flow 1 state: intro → pick (error) → detail … ×6 → welldone → question (warn) → correct → controls → loading
+const G = { state: 'intro', k: 0, err: '', hint: null, cur: null, loadT: 0, demoErr: false, demoQ: false };
+const S = {
+  flow: 1, menu: null,
+  i: 0, mode: 'task', err: null, prog: null, assess: false, auto: false, demoErr: false,
+  stats: { errors: 0, hints: 0, nudges: 0 }, t0: 0, finished: false, toastUntil: 0, toastText: '', busy: false,
+};
+const row = () => ROWS[S.i];
+
+function drawTask() { if (S.flow === 1) drawGownTask(); else drawFlow3Task(); }
+function drawFlow3Task() {
+  const r = row(), finished = S.finished;
+  const tone = finished ? 'success' : S.mode === 'error' ? (S.err?.warn ? 'warn' : 'error') : S.mode === 'nudge' ? 'warn' : S.mode === 'progress' ? 'progress' : 'task';
+  let title = r.i, detail = r.d || '', progress = -1, showMe = !!r.show && !S.assess && S.mode !== 'progress', primary = '';
+  if (S.mode === 'progress') { title = S.prog.title; detail = S.prog.detail; progress = S.prog.p; }
+  if (S.mode === 'error') { title = S.err.title; detail = S.err.detail; primary = 'Try again'; showMe = !!r.show && !S.assess && S.err.showMe; }
+  if (S.mode === 'nudge') { title = r.nu || r.i; detail = ''; }
+  if (S.mode === 'demo') { detail = 'Watch the ghost hands, then do it yourself.'; primary = 'Try again'; showMe = false; }
+  if (finished) {
+    const secs = Math.round((performance.now() - S.t0) / 1000);
+    title = 'Needle replaced. Well done!';
+    detail = `You kept aseptic conditions through all 13 steps.\nErrors corrected ${S.stats.errors} · Hints ${S.stats.hints} · Nudges ${S.stats.nudges} · Time ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    primary = 'Try again'; showMe = false;
+  }
+  const stepN = finished ? 13 : r.n;
+  drawCard({
+    header: finished ? 'NEEDLE REPLACEMENT · COMPLETE' : `STEP ${stepN} OF 13 · ${PHASES[r.ph].toUpperCase()}`,
+    segN: 13, segCur: stepN, segAll: finished, tone, title, detail, progress,
+    hint: finished || S.assess ? '' : r.h,
+    buttons: [showMe && { id: 'showme', label: 'Show me', variant: 'secondary' }, primary && { id: 'primary', label: primary }].filter(Boolean),
+  });
+}
+function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
+
+function toastVisible() { return performance.now() < S.toastUntil; }
+function drawToast() {
+  const p = toast, c = p.ctx; p.begin();
+  if (toastVisible()) {
+    c.font = `600 20px ${FONT}`; const label = '✓  ' + S.toastText, w = c.measureText(label).width + 44;
+    p.surface(0, 4, w, 52, 26, hexA(C.success, 0.75), 2, 'rgb(19,43,40)');
+    c.fillStyle = C.text1; c.fillText(label, 22, 37);
+  } else p.bg = { x: 0, y: 0, w: 0, h: 0 };
+  p.end();
+}
+function drawHint() {
+  const p = hint, c = p.ctx; p.begin();
+  const text = S.flow === 1 ? gownHint() : S.finished ? '' : row().h;
+  if (text && !S.assess) {
+    c.font = `500 20px ${FONT}`; const w = Math.min(720, c.measureText(text).width + 96);
+    p.surface(0, 6, w, 64, 32);
+    c.strokeStyle = C.accent; c.lineWidth = 3; c.beginPath(); c.arc(38, 30, 11, 0, Math.PI * 2); c.stroke();
+    rr(c, 32, 36, 12, 22, 6); c.fillStyle = C.surface; c.fill(); c.lineWidth = 2.5; c.stroke();
+    c.fillStyle = C.text1; c.fillText(text, 70, 45);
+  } else p.bg = { x: 0, y: 0, w: 0, h: 0 };
+  p.end();
+}
+function drawMenu(p, tab, body) {
+  const c = p.ctx; p.nested = false; p.oy = 0; p.begin();
+  p.surface(0, 0, 520, MENU_H, 28);
+  // tab bar: Steps | Help, and close
+  const tabs = [['tab-steps', 'Steps'], ['tab-help', 'Help']];
+  let x = 24;
+  for (const [id, label] of tabs) {
+    const on = tab === id.slice(4), hov = p.hover === id, w = 120;
+    rr(c, x, 20, w, 44, 22);
+    if (on) { c.fillStyle = hexA(C.accent, 0.2); c.fill(); c.strokeStyle = C.accent; c.lineWidth = 2; c.stroke(); }
+    else { c.fillStyle = hov ? C.surface : 'rgba(0,0,0,0)'; c.fill(); c.strokeStyle = C.border; c.lineWidth = 1.5; c.stroke(); }
+    c.font = `600 18px ${FONT}`; c.fillStyle = on ? C.text1 : C.text2; c.textAlign = 'center'; c.fillText(label, x + w / 2, 48); c.textAlign = 'left';
+    p.hits.push({ id, x, y: 20, w, h: 44 }); x += w + 10;
+  }
+  p.button('menu-close', 520 - 24 - 56, 20, 56, '✕', 'secondary', false, 44);
+  c.save(); c.translate(0, 64); p.oy = 64; p.nested = true;
+  body();
+  c.restore(); p.nested = false; p.oy = 0;
+  p.end();
+}
+function drawProc() { drawMenu(proc, 'steps', S.flow === 1 ? drawProcGown : drawProc3); }
+function drawProc3() {
+  const p = proc, c = p.ctx; p.begin();
+  p.surface(0, 0, 520, 740, 28);
+  c.fillStyle = C.text1; c.font = `600 26px ${FONT}`; c.fillText('Needle replacement', 32, 56);
+  c.fillStyle = C.text3; c.font = `500 17px ${FONT}`; c.fillText('Flow 3 · 13 steps in 4 phases', 32, 84);
+  let y = 118; const cur = S.finished ? 14 : row().n;
+  let stepIdx = 0;
+  PHASES.forEach((name, k) => {
+    c.font = `600 14px ${FONT}`; c.fillStyle = C.text3; c.letterSpacing = '1.5px'; c.fillText(name.toUpperCase(), 32, y + 14); c.letterSpacing = '0px'; y += 30;
+    const count = [4, 2, 4, 3][k];
+    for (let j = 0; j < count; j++) {
+      const n = ++stepIdx, done = n < cur, on = n === cur, cy = y + 16;
+      c.beginPath(); c.arc(46, cy, 13, 0, Math.PI * 2);
+      if (done) { c.fillStyle = hexA(C.success, 0.18); c.fill(); c.strokeStyle = C.success; c.lineWidth = 2; c.stroke(); c.strokeStyle = C.success; c.lineWidth = 2.5; c.beginPath(); c.moveTo(40, cy); c.lineTo(44.5, cy + 4.5); c.lineTo(52, cy - 4); c.stroke(); }
+      else if (on) { c.fillStyle = C.accent; c.fill(); c.fillStyle = C.panel; c.font = `700 13px ${FONT}`; c.textAlign = 'center'; c.fillText(String(n), 46, cy + 4.5); c.textAlign = 'left'; }
+      else { c.strokeStyle = C.border; c.lineWidth = 2; c.stroke(); c.fillStyle = C.text3; c.font = `600 13px ${FONT}`; c.textAlign = 'center'; c.fillText(String(n), 46, cy + 4.5); c.textAlign = 'left'; }
+      if (on) { rr(c, 24, y - 2, 472, 36, 12); c.fillStyle = hexA(C.accent, 0.12); c.fill(); }
+      c.font = `${on ? 600 : 400} 18px ${FONT}`; c.fillStyle = on ? C.text1 : done ? C.text2 : C.text3; c.fillText(SHORT[n - 1], 72, cy + 6);
+      y += 36;
+    }
+    y += 8;
+  });
+  p.end();
+}
+function drawHelp() { drawMenu(help, 'help', drawHelpBody); }
+function drawHelpBody() {
+  const p = help, c = p.ctx; p.begin();
+  p.surface(0, 0, 520, 740, 28);
+  c.fillStyle = C.text1; c.font = `600 26px ${FONT}`; c.fillText('Assistant', 32, 56);
+  const mode = S.assess ? 'Assessment mode' : 'Training mode';
+  c.font = `600 14px ${FONT}`; const mw = c.measureText(mode).width + 26; rr(c, 520 - 32 - mw, 34, mw, 30, 15);
+  c.fillStyle = S.assess ? hexA(C.warning, 0.18) : hexA(C.accent, 0.18); c.fill(); c.strokeStyle = S.assess ? C.warning : C.accent; c.lineWidth = 1.5; c.stroke();
+  c.fillStyle = C.text1; c.fillText(mode, 520 - 32 - mw + 13, 54);
+  // about this step
+  rr(c, 32, 86, 456, 190, 18); c.fillStyle = C.surface; c.fill();
+  c.font = `600 14px ${FONT}`; c.fillStyle = C.text3; c.letterSpacing = '1.5px'; c.fillText(S.finished ? 'RUN COMPLETE' : 'ABOUT THIS STEP', 52, 118); c.letterSpacing = '0px';
+  c.font = `400 19px ${FONT}`; c.fillStyle = C.text2;
+  const about = S.flow === 1 ? gownAbout() : S.finished ? 'Every step done in order. Try again in assessment mode to run it without cues.' : row().why;
+  wrap(c, about, 416).slice(0, 5).forEach((l, k) => c.fillText(l, 52, 152 + k * 28));
+  let y = 300; const r = row();
+  p.button('h-showme', 32, y, 456, 'Show me', 'secondary', S.flow === 1 ? (G.state !== 'pick' || S.assess) : (S.finished || !r.show || S.assess)); y += 80;
+  p.button('h-repeat', 32, y, 456, 'Repeat instruction', 'secondary', S.finished); y += 80;
+  p.button('h-assess', 32, y, 456, S.assess ? 'Assessment mode: On' : 'Assessment mode: Off', 'secondary'); y += 80;
+  p.button('h-auto', 32, y, 456, S.auto ? 'Auto-play: On' : 'Auto-play: Off', 'secondary'); y += 80;
+  p.button('h-restart', 32, y, 456, 'Restart', 'primary'); y += 84;
+  c.font = `500 16px ${FONT}`; c.fillStyle = C.text3;
+  c.fillText(`Errors ${S.stats.errors}   ·   Hints ${S.stats.hints}   ·   Nudges ${S.stats.nudges}`, 32, 712);
+  p.end();
+}
+task.draw = drawTask; toast.draw = drawToast; hint.draw = drawHint; proc.draw = drawProc; help.draw = drawHelp;
+const redrawAll = () => { drawTask(); drawToast(); drawHint(); drawProc(); drawHelp(); syncHud(); };
+
+// The Steps / Help menu is docked to the task card (see drawMenu); nothing floats at the sides of the room any more.
+function placeSidePanels() {}
+function setMenu(tab) {
+  S.menu = tab; proc.mesh.visible = tab === 'steps'; help.mesh.visible = tab === 'help';
+  drawTask(); if (tab === 'steps') drawProc(); if (tab === 'help') drawHelp();
+}
+
+
+// ------------------------------------------------------------------ cues: rings, labels, rotation arc, ghost hands
+function labelSprite() {
+  const cv = document.createElement('canvas'); cv.width = 640; cv.height = 112;
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, toneMapped: false }));
+  s.renderOrder = 8; s.userData = { cv, tex, text: '' };
+  s.setText = (text, col) => {
+    const c = cv.getContext('2d'); c.clearRect(0, 0, 640, 112); c.font = `600 40px ${FONT}`;
+    const w = Math.min(620, c.measureText(text).width + 64), x = (640 - w) / 2;
+    rr(c, x, 14, w, 80, 40); c.fillStyle = 'rgba(15,23,42,0.95)'; c.fill(); c.strokeStyle = col; c.lineWidth = 4; c.stroke();
+    c.fillStyle = C.text1; c.textAlign = 'center'; c.fillText(text, 320, 68); tex.needsUpdate = true;
+    s.scale.set(0.32, 0.056, 1);
+  };
+  return s;
+}
+const cueRoot = new THREE.Group(); scene.add(cueRoot);
+const cueRings = [], cueLabels = [];
+function ringMesh() {
+  const g = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 64), new THREE.MeshBasicMaterial({ color: C.focus, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthTest: false, toneMapped: false }));
+  const fill = new THREE.Mesh(new THREE.CircleGeometry(0.92, 64), new THREE.MeshBasicMaterial({ color: C.focus, transparent: true, opacity: 0.1, side: THREE.DoubleSide, depthTest: false, toneMapped: false }));
+  const halo = new THREE.Mesh(new THREE.RingGeometry(1.12, 1.15, 64), new THREE.MeshBasicMaterial({ color: C.focus, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthTest: false, toneMapped: false }));
+  [ring, fill, halo].forEach(m => { m.renderOrder = 5; g.add(m); }); // drawn before the panels, so panels stay on top
+  g.userData = { ring, fill, halo };
+  return g;
+}
+const arc = (() => { // rotation cue around the needle
+  const g = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color: C.focus, depthTest: false, transparent: true, toneMapped: false });
+  const t = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.008, 8, 64, Math.PI * 1.5), mat); g.add(t);
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.05, 16), mat); cone.position.set(0, -0.11, 0); cone.rotation.z = Math.PI / 2; g.add(cone);
+  g.children.forEach(m => m.renderOrder = 6); g.visible = false; scene.add(g); return g;
+})();
+const ghost = (() => { // translucent "Show me" hand
+  const g = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color: C.focus, transparent: true, opacity: 0.45, depthWrite: false, toneMapped: false });
+  const palm = new THREE.Mesh(new RoundedBoxGeometry(0.08, 0.1, 0.03, 2, 0.012), mat); g.add(palm);
+  for (let k = 0; k < 4; k++) { const f = new THREE.Mesh(new THREE.CapsuleGeometry(0.009, 0.05, 4, 8), mat); f.position.set(-0.03 + k * 0.02, 0.08, 0); g.add(f); }
+  const th = new THREE.Mesh(new THREE.CapsuleGeometry(0.01, 0.04, 4, 8), mat); th.position.set(0.05, 0.02, 0.01); th.rotation.z = -0.9; g.add(th);
+  g.visible = false; scene.add(g); return g;
+})();
+
+function targetsFor(tag) { return pickables.filter(o => o.userData.tags.includes(tag)); }
+function boundsOf(o) { const b = new THREE.Box3().setFromObject(o); return { center: b.getCenter(new THREE.Vector3()), size: b.getSize(new THREE.Vector3()) }; }
+let cueTone = 'task';
+function setCues() {
+  cueRings.forEach(r => cueRoot.remove(r)); cueLabels.forEach(l => cueRoot.remove(l)); cueRings.length = 0; cueLabels.length = 0;
+  arc.visible = false;
+  if (S.flow === 1) { // flow 1 only rings the next item after "Show me"
+    if (G.hint && G.state === 'pick' && !S.assess) { const ring = ringMesh(); ring.userData.target = G.hint; ring.userData.flat = false; cueRoot.add(ring); cueRings.push(ring); }
+    return;
+  }
+  if (S.finished || S.assess || S.mode === 'progress' && row().c !== 'WaitForMachine') return;
+  const r = row(); const objs = targetsFor(r.t);
+  const col = toneColor(cueTone);
+  objs.forEach((o, k) => {
+    const ring = ringMesh(); ring.userData.target = o; ring.userData.flat = r.t === 'FloorZone';
+    Object.values(ring.userData).forEach(m => m?.material?.color?.set(col));
+    cueRoot.add(ring); cueRings.push(ring);
+    if (k === 0) { const l = labelSprite(); l.setText(TAG_LABEL[r.t] || r.t, col); l.userData.target = o; cueRoot.add(l); cueLabels.push(l); }
+  });
+  if (r.c === 'RotateComponent' && objs[0]) { arc.visible = true; arc.userData.target = objs[0]; arc.userData.dir = r.dir; arc.children.forEach(m => m.material.color.set(col)); }
+}
+function updateCues(t) {
+  const camPos = viewPos();
+  for (const ring of cueRings) {
+    const { center, size } = boundsOf(ring.userData.target);
+    const rad = Math.max(0.06, Math.max(size.x, size.y, size.z) * 0.55);
+    const pulse = 1 + Math.sin(t * 4) * 0.05;
+    if (ring.userData.flat) { ring.position.set(center.x, 0.012, center.z); ring.rotation.set(-Math.PI / 2, 0, 0); ring.scale.setScalar(0.5 * pulse); }
+    else { ring.position.copy(center); ring.lookAt(camPos); ring.scale.setScalar(rad * pulse); }
+    ring.userData.halo.material.opacity = 0.25 + 0.25 * (Math.sin(t * 4) * 0.5 + 0.5);
+  }
+  for (const l of cueLabels) {
+    const { center, size } = boundsOf(l.userData.target);
+    const flat = row().t === 'FloorZone';
+    // labels sit under their target: the task panel, toast and hint already stack above it
+    l.position.set(center.x, flat ? 0.32 : center.y - Math.max(size.y / 2, 0.05) - 0.09, center.z);
+  }
+  if (arc.visible) {
+    const { center } = boundsOf(arc.userData.target);
+    arc.position.copy(center); arc.lookAt(camPos);
+    arc.rotateZ(t * 1.6 * -arc.userData.dir);
+  }
+}
+
+// ------------------------------------------------------------------ tweens
+const tweens = [];
+function tween(dur, fn, done) { return new Promise(res => tweens.push({ t: 0, dur, fn, done: () => { done?.(); res(); } })); }
+const ease = x => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+function stepTweens(dt) {
+  for (let k = tweens.length - 1; k >= 0; k--) { const tw = tweens[k]; tw.t += dt; const p = Math.min(1, tw.t / tw.dur); tw.fn(ease(p), p); if (p >= 1) { tweens.splice(k, 1); tw.done(); } }
+}
+function moveTo(obj, to, dur) { const from = obj.position.clone(); return tween(dur, e => obj.position.lerpVectors(from, to, e)); }
+function worldToLocal(parent, v) { return parent.worldToLocal(v.clone()); }
+
+// ------------------------------------------------------------------ flow
+let idleTimer = 0;
+function resetIdle() { idleTimer = 0; }
+function viewPos() { return renderer.xr.isPresenting ? renderer.xr.getCamera().getWorldPosition(new THREE.Vector3()) : camera.position.clone(); }
+
+function enterRow() {
+  S.mode = 'task'; S.err = null; S.prog = null; S.demoErr = false; cueTone = 'task'; resetIdle();
+  const r = row();
+  if (r.c === 'WaitForMachine') {
+    startProgress(r.i, r.d, r.v, () => advance());
+    moveTo(cover, COVER_DOWN, r.v * 0.9);
+  }
+  setCues(); placeTask(true); redrawAll();
+  // desktop: frame each new target from the standing side (in VR the trainee simply turns to it)
+  if (!renderer.xr.isPresenting && S.i > 0) {
+    const objs = targetsFor(r.t); if (objs[0]) {
+      const { center } = boundsOf(objs[0]);
+      const look = center.clone(); look.y = THREE.MathUtils.clamp(look.y, 0.95, 1.5);
+      const cam = new THREE.Vector3(center.x * 0.55, 1.62, THREE.MathUtils.clamp(center.z + 2.1, 0.55, 1.6));
+      const fromT = controls.target.clone(), fromC = camera.position.clone();
+      tween(0.9, e => { controls.target.lerpVectors(fromT, look, e); camera.position.lerpVectors(fromC, cam, e); });
+    }
+  }
+}
+function startProgress(title, detail, dur, onDone) {
+  S.mode = 'progress'; S.prog = { title, detail, dur, t: 0, p: 0, onDone }; setCues(); redrawAll();
+}
+function showToast(text) { if (!text) return; S.toastText = text; S.toastUntil = performance.now() + 1600; drawToast(); drawTask(); }
+function advance() {
+  showToast(row().done);
+  if (S.i >= ROWS.length - 1) { finish(); return; }
+  S.i++; enterRow();
+}
+function finish() {
+  S.finished = true; S.mode = 'done'; setCues(); placeTask(true); redrawAll();
+  speak('Needle replaced. Well done.');
+}
+// restarts flow 3; fromGowning = arriving from flow 1 (keep its stats, the caller animates the camera)
+function restart(fromGowning = false) {
+  tweens.length = 0;
+  S.flow = 3; G.state = 'done'; G.cur = null; G.hint = null;
+  if (!fromGowning) { S.stats = { errors: 0, hints: 0, nudges: 0 }; placeSidePanels(3); }
+  S.i = 0; S.finished = false; S.t0 = performance.now(); S.busy = false;
+  // reset props
+  doors.forEach(d => d.hinge.rotation.y = 0);
+  cover.position.copy(COVER_UP);
+  RABS.add(oldNeedle); oldNeedle.position.copy(dock.position); oldNeedle.rotation.set(0, 0, 0);
+  packets[2].add(newNeedle); newNeedle.position.set(0.01, 0.03, 0); newNeedle.rotation.set(0, 0, Math.PI / 2); newNeedle.scale.setScalar(0.9);
+  if (!pickables.includes(newNeedle)) pickable(newNeedle, []);
+  newNeedle.userData.tags = ['SterileNeedle']; oldNeedle.userData.tags = ['NeedleBase'];
+  startBtn.position.set(0, 0, 0);
+  if (!renderer.xr.isPresenting) { if (!fromGowning) { camera.position.copy(START_CAM); controls.target.copy(START_LOOK); } rig.position.set(0, 0, 0); }
+  else { rig.position.set(0, 0, START_CAM.z); rig.rotation.y = 0; }
+  ghost.visible = false;
+  enterRow();
+}
+
+function error(title, detail, opts = {}) {
+  S.stats.errors++;
+  if (S.assess) { redrawAll(); pulseHaptics(2); return; } // logged, not shown
+  S.mode = 'error'; cueTone = opts.warn ? 'warn' : 'error';
+  S.err = { title, detail, warn: !!opts.warn, showMe: S.stats.errors > 0 };
+  setCues(); redrawAll(); pulseHaptics(2); speak(title);
+  if (opts.autoClear) setTimeout(() => { if (S.mode === 'error' && S.err?.title === title) { S.mode = S.prog ? 'progress' : 'task'; cueTone = 'task'; setCues(); redrawAll(); } }, opts.autoClear);
+}
+function retry() { if (S.finished) { restart(); return; } S.mode = 'task'; S.err = null; cueTone = 'task'; ghost.visible = false; setCues(); redrawAll(); resetIdle(); }
+function nudge() {
+  if (S.assess || S.finished || S.mode !== 'task') return;
+  S.mode = 'nudge'; S.stats.nudges++; cueTone = 'warn'; setCues(); redrawAll(); speak(row().nu || row().i);
+}
+async function showMe() {
+  const r = row(); if (!r.show || S.finished) return;
+  S.stats.hints++; S.mode = 'demo'; cueTone = 'task'; setCues(); redrawAll();
+  const o = targetsFor(r.t)[0]; if (!o) return;
+  const { center } = boundsOf(o); const vp = viewPos();
+  const startP = center.clone().lerp(vp, 0.45).add(new THREE.Vector3(0.15, -0.15, 0));
+  ghost.visible = true; ghost.position.copy(startP); ghost.lookAt(vp); ghost.rotation.z = 0;
+  for (let k = 0; k < 2 && S.mode === 'demo'; k++) {
+    ghost.position.copy(startP);
+    await moveTo(ghost, center.clone().add(new THREE.Vector3(0, 0.06, 0.05)), 0.9);
+    if (r.c === 'Sanitize') await tween(1.0, (e, p) => { ghost.position.x = center.x + Math.sin(p * Math.PI * 6) * 0.04; });
+    else if (r.c === 'RotateComponent') { const z0 = ghost.rotation.z; await tween(0.9, e => { ghost.rotation.z = z0 - r.dir * e * Math.PI / 2; }); }
+    else if (r.c === 'DockItem') await tween(0.7, e => { ghost.position.y = center.y + 0.06 - e * 0.05; });
+    else await tween(0.5, () => {});
+    ghost.rotation.z = 0;
+  }
+  ghost.visible = false;
+}
+
+// what happens when the trainee completes the current row
+async function complete() {
+  const r = row(); if (S.busy) return;
+  S.busy = true; resetIdle(); pulseHaptics(1);
+  cueRings.forEach(c => c.visible = false); cueLabels.forEach(c => c.visible = false); arc.visible = false;
+  switch (r.c) {
+    case 'EnterVolume':
+      if (renderer.xr.isPresenting) await moveTo(rig, new THREE.Vector3(0, 0, VR_STAND_Z), 1.0);
+      else { const fc = camera.position.clone(), ft = controls.target.clone(); await tween(1.2, e => { camera.position.lerpVectors(fc, STAND_CAM, e); controls.target.lerpVectors(ft, STAND_LOOK, e); }); }
+      break;
+    case 'Sanitize':
+      S.busy = false;
+      startProgress('Sanitizing…', 'Keep rubbing until the bar is full.', 3, () => advance());
+      return;
+    case 'PullHandles': await tween(1.0, e => doors.forEach(d => d.hinge.rotation.y = d.s * DOOR_OPEN * e)); break;
+    case 'PushHandles': await tween(1.0, e => doors.forEach(d => d.hinge.rotation.y = d.s * DOOR_OPEN * (1 - e))); break;
+    case 'PressButton': await tween(0.15, e => startBtn.position.y = -0.006 * e); await tween(0.15, e => startBtn.position.y = -0.006 * (1 - e)); break;
+    case 'RotateComponent': {
+      const target = r.t === 'NeedleBase' ? oldNeedle : newNeedle; const y0 = target.rotation.y;
+      await tween(0.8, e => target.rotation.y = y0 - r.dir * e * Math.PI / 2); break;
+    }
+    case 'PlaceOnTarget': {
+      await moveTo(oldNeedle, oldNeedle.position.clone().add(new THREE.Vector3(0, 0.25, 0.25)), 0.5);
+      const trayTop = tray.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0, 0.03, 0));
+      CART.attach(oldNeedle); oldNeedle.userData.tags = [];
+      await moveTo(oldNeedle, worldToLocal(CART, trayTop), 0.9);
+      await tween(0.3, e => oldNeedle.rotation.z = e * Math.PI / 2);
+      break;
+    }
+    case 'PickItem':
+      scene.attach(newNeedle);
+      await moveTo(newNeedle, newNeedle.position.clone().add(new THREE.Vector3(0, 0.18, 0)), 0.5);
+      newNeedle.userData.tags = ['DockingStation']; break; // held needle also counts as the docking target
+    case 'DockItem': {
+      const dockW = dock.getWorldPosition(new THREE.Vector3());
+      const zr = newNeedle.rotation.z;
+      await tween(0.4, e => newNeedle.rotation.z = zr * (1 - e));
+      await moveTo(newNeedle, dockW.clone().add(new THREE.Vector3(0, 0.12, 0.25)), 0.9); // in front of the mount, then up into it
+      RABS.attach(newNeedle);
+      await moveTo(newNeedle, worldToLocal(RABS, dockW), 0.5);
+      newNeedle.userData.tags = ['LockScrew']; break;
+    }
+    case 'MoveComponent': await moveTo(cover, COVER_UP, 1.1); break;
+  }
+  S.busy = false;
+  advance();
+}
+
+// a pick on a 3D object
+function onObject(obj) {
+  if (S.flow === 1) { onGownObject(obj); return; }
+  if (S.busy || S.finished) return;
+  const r = row(), tags = obj.userData.tags || [];
+  if (S.mode === 'progress') {
+    if (r.c === 'WaitForMachine' && obj !== zone) error(r.e, r.ed, { warn: true, autoClear: 2200 });
+    return;
+  }
+  if (S.mode === 'demo') { ghost.visible = false; S.mode = 'task'; }
+  if (tags.includes(r.t)) { if (S.mode === 'error' || S.mode === 'nudge') { S.mode = 'task'; cueTone = 'task'; } complete(); return; }
+  if (r.c === 'PickItem' && packets.includes(obj)) { error(r.e, r.ed); return; }
+  error('That’s not the part for this step.', 'Look for the glowing ring, then try again.');
+}
+// a pick on a panel button
+function onButton(id) {
+  resetIdle();
+  if (id === 'menu') { setMenu(S.menu ? null : 'steps'); return; }
+  if (id === 'tab-steps') { setMenu('steps'); return; }
+  if (id === 'tab-help') { setMenu('help'); return; }
+  if (id === 'menu-close') { setMenu(null); return; }
+  if (id === 'h-assess') { setAssess(!S.assess); return; }
+  if (id === 'h-auto') { setAuto(!S.auto); return; }
+  if (S.flow === 1) { onGownButton(id); return; }
+  if (id === 'primary') retry();
+  else if (id === 'showme' || id === 'h-showme') showMe();
+  else if (id === 'h-repeat') speak(S.finished ? 'Run complete.' : row().i);
+  else if (id === 'h-assess') setAssess(!S.assess);
+  else if (id === 'h-auto') setAuto(!S.auto);
+  else if (id === 'h-restart') restart();
+}
+
+// ------------------------------------------------------------------ flow 1: gowning + entry check
+function wristHintActive() { return hint.mesh.parent !== taskGroup; }
+function drawCard(cfg) { // compact task card shared by flow 1 and flow 3
+  const p = task, c = p.ctx; p.begin();
+  const tone = cfg.tone || 'task', status = tone === 'warn' || tone === 'error' || tone === 'success', tc = toneColor(tone);
+  const pad = 26, iw = TW - pad * 2, progress = cfg.progress ?? -1;
+  const tx = pad + (status ? 60 : 0), tw = TW - tx - pad;
+  c.font = `600 26px ${FONT}`; const tLines = wrap(c, cfg.title, tw);
+  c.font = `400 19px ${FONT}`; const dLines = cfg.detail ? wrap(c, cfg.detail, tw).slice(0, 4) : [];
+  const barY = pad + 44, bodyTop = barY + 24;
+  const textEnd = bodyTop + tLines.length * 34 + (dLines.length ? 4 + dLines.length * 28 : 0) + (progress >= 0 ? 26 : 0);
+  let y = Math.max(bodyTop + (status ? 48 : 0), textEnd) + 18;
+  // footer: controller hint on the left, actions on the right (hint gets its own line when both don't fit)
+  const btns = cfg.buttons || [], hintText = cfg.hint && !wristHintActive() ? cfg.hint : '';
+  c.font = `600 22px ${FONT}`; const bw = btns.map(b => Math.max(150, c.measureText(b.label).width + 60));
+  const btnsW = bw.reduce((a, b) => a + b, 0) + 14 * Math.max(0, btns.length - 1);
+  c.font = `500 17px ${FONT}`; const hintW = hintText ? c.measureText(hintText).width + 34 : 0;
+  let hintY = null, btnY = null;
+  if (hintText && btns.length && hintW + btnsW + 24 > iw) { hintY = y; y += 36; btnY = y; y += 60; }
+  else if (btns.length) { btnY = y; hintY = hintText ? y + 13 : null; y += 60; }
+  else if (hintText) { hintY = y; y += 30; }
+  const H = y + pad - (btns.length || hintText ? 0 : 18);
+  p.surface(0, 0, TW, H, 26, status ? hexA(tc, 0.75) : 'rgba(255,255,255,0.14)', status ? 2.5 : 1.5);
+  // header: what step this is, or briefly the done message
+  if (toastVisible()) {
+    c.font = `600 17px ${FONT}`; const label = '✓  ' + S.toastText, w = c.measureText(label).width + 30;
+    rr(c, pad, pad - 4, w, 34, 17); c.fillStyle = hexA(C.success, 0.18); c.fill(); c.strokeStyle = hexA(C.success, 0.7); c.lineWidth = 1.5; c.stroke();
+    c.fillStyle = C.text1; c.fillText(label, pad + 15, pad + 19);
+  } else {
+    c.font = `600 15px ${FONT}`; c.fillStyle = C.text3; c.letterSpacing = '1.4px'; c.fillText(cfg.header, pad, pad + 18); c.letterSpacing = '0px';
+  }
+  p.button('menu', TW - pad - 104, pad - 6, 104, S.menu ? 'Close' : 'Menu', 'secondary', false, 38);
+  // thin segmented progress
+  const n = cfg.segN, sw = (iw - 4 * (n - 1)) / n;
+  for (let k = 0; k < n; k++) { rr(c, pad + k * (sw + 4), barY, sw, 5, 2.5); c.fillStyle = cfg.segAll || k < cfg.segCur - 1 ? C.accent : k === cfg.segCur - 1 ? C.text1 : C.border; c.fill(); }
+  // status icon (only for warn / error / success; task steps stay text-only)
+  if (status) {
+    const cx = pad + 22, cy = bodyTop + 20;
+    c.beginPath(); c.arc(cx, cy, 21, 0, Math.PI * 2); c.fillStyle = hexA(tc, 0.16); c.fill(); c.strokeStyle = tc; c.lineWidth = 2.5; c.stroke();
+    c.strokeStyle = tc; c.lineWidth = 4; c.lineCap = 'round'; c.beginPath();
+    if (tone === 'success') { c.moveTo(cx - 9, cy + 1); c.lineTo(cx - 3, cy + 7); c.lineTo(cx + 9, cy - 6); }
+    else if (tone === 'error') { c.moveTo(cx - 7, cy - 7); c.lineTo(cx + 7, cy + 7); c.moveTo(cx + 7, cy - 7); c.lineTo(cx - 7, cy + 7); }
+    else { c.moveTo(cx, cy - 9); c.lineTo(cx, cy + 3); c.moveTo(cx, cy + 9); c.lineTo(cx, cy + 10); }
+    c.stroke(); c.lineCap = 'butt';
+  }
+  c.font = `600 26px ${FONT}`; c.fillStyle = status ? tc : C.text1;
+  tLines.forEach((l, k) => c.fillText(l, tx, bodyTop + 26 + k * 34));
+  let ty = bodyTop + tLines.length * 34;
+  if (dLines.length) { c.font = `400 19px ${FONT}`; c.fillStyle = C.text2; dLines.forEach((l, k) => c.fillText(l, tx, ty + 26 + k * 28)); ty += 4 + dLines.length * 28; }
+  if (progress >= 0) { rr(c, tx, ty + 12, tw, 10, 5); c.fillStyle = C.border; c.fill(); rr(c, tx, ty + 12, Math.max(10, tw * progress), 10, 5); c.fillStyle = C.accent; c.fill(); }
+  if (hintY !== null) {
+    c.strokeStyle = C.accent; c.lineWidth = 2.5; c.beginPath(); c.arc(pad + 9, hintY + 9, 8, 0, Math.PI * 2); c.stroke();
+    rr(c, pad + 5, hintY + 13, 8, 14, 4); c.fillStyle = C.surface; c.fill(); c.lineWidth = 2; c.stroke();
+    c.font = `500 17px ${FONT}`; c.fillStyle = C.text3; c.fillText(hintText, pad + 28, hintY + 21);
+  }
+  if (btnY !== null) { let ax = TW - pad; for (let k = btns.length - 1; k >= 0; k--) { ax -= bw[k]; p.button(btns[k].id, ax, btnY, bw[k], btns[k].label, btns[k].variant || 'primary', false, 60); ax -= 14; } }
+  p.end();
+  p.heightM = H * p.m;
+}
+const GSTEP = { intro: 1, pick: 2, error: 2, detail: 3, welldone: 4, question: 5, warn: 6, correct: 6, controls: 6, loading: 6, done: 6 };
+function drawGownTask() {
+  const st = G.state, n = GSTEP[st];
+  const entryDone = ['correct', 'controls', 'loading', 'done'].includes(st);
+  const cfg = {
+    header: `STEP ${n} OF 6 · ${n >= 5 ? 'ENTRY CHECK' : 'GOWNING'}`, hint: gownHint(),
+    segN: 6, segCur: n, segAll: entryDone, tone: 'task', title: '', detail: '', buttons: [],
+  };
+  switch (st) {
+    case 'intro': cfg.title = 'Gown up for RABS work'; cfg.detail = 'Put on the right gowning items, in the order you put them on. Select each item on the bench.'; cfg.buttons = [{ id: 'g-start', label: 'Start' }]; break;
+    case 'pick': cfg.title = 'Choose your gowning items in order'; cfg.detail = `Select the item you put on ${ORD[G.k]}. ${G.k} of 6 on.`; cfg.progress = G.k / 6; if (!S.assess) cfg.buttons = [{ id: 'showme', label: 'Show me', variant: 'secondary' }]; break;
+    case 'error': cfg.tone = 'error'; cfg.title = 'Not yet.'; cfg.detail = G.err; cfg.buttons = [{ id: 'g-retry', label: 'Try again' }]; break;
+    case 'detail': cfg.title = G.cur.userData.item.name; cfg.detail = G.cur.userData.item.why; cfg.buttons = [{ id: 'g-gotit', label: 'Got it' }]; break;
+    case 'welldone': cfg.tone = 'success'; cfg.title = 'Well done!'; cfg.detail = 'You chose the right gowning items and put them on in the correct order for RABS work. Gowning keeps the area sterile and protects both the product and the environment.'; cfg.buttons = [{ id: 'g-continue', label: 'Continue' }]; break;
+    case 'question': cfg.title = 'Before you enter'; cfg.detail = 'Have you checked the pressure gradient and the cleanliness grade of the controlled area?'; cfg.buttons = [{ id: 'g-notyet', label: 'Not yet', variant: 'secondary' }, { id: 'g-yes', label: 'Yes, I checked both' }]; break;
+    case 'warn': cfg.tone = 'warn'; cfg.title = 'Check before you enter'; cfg.detail = 'The pressure gradient keeps contaminants out of clean areas, and the cleanliness grade (for example ISO 5 for critical areas) shows the area meets standards. Check both before you go in.'; cfg.buttons = [{ id: 'g-back1', label: 'Back to step 1', variant: 'secondary' }, { id: 'g-again', label: 'Try again' }]; break;
+    case 'correct': cfg.tone = 'success'; cfg.title = 'Correct!'; cfg.detail = 'The right pressure gradient makes air flow from cleaner to less clean areas, so contamination can’t get in. The cleanliness grade (for example ISO 5 or Grade A/B) confirms the area meets regulations that protect product quality and patient safety.'; cfg.buttons = [{ id: 'g-next', label: 'Continue' }]; break;
+    case 'controls': cfg.title = 'Your controllers'; cfg.detail = 'Grip: hold objects.   Trigger: select and press buttons.\nMenu button: open or close the menu.   Thumbstick: move.'; cfg.buttons = [{ id: 'g-ctrl', label: 'Got it' }]; break;
+    case 'loading': case 'done': cfg.tone = 'progress'; cfg.title = 'Inspection in progress…'; cfg.detail = 'Taking you to the filling line for the needle replacement.'; cfg.progress = Math.min(1, G.loadT / 2.5); break;
+  }
+  drawCard(cfg);
+}
+function gownHint() {
+  return ({ intro: 'Point at Start and pull the trigger', pick: 'Point at an item and pull the trigger to pick it up', error: 'Point at Try again and pull the trigger', detail: 'Pull the trigger on Got it when you’re ready', question: 'Point at your answer and pull the trigger', warn: 'Point at a button and pull the trigger' })[G.state] || '';
+}
+function gownAbout() {
+  if (G.state === 'detail') return G.cur.userData.item.why;
+  return ({
+    intro: 'In a RABS area your gown protects the product from you. Each item blocks a different source of particles.',
+    pick: 'Work top-down: hair and face first, then body and feet, then eyes. Sterile gloves always go on last.',
+    error: 'Each item has its place in the order, so later items don’t pick up particles from earlier ones.',
+    welldone: 'Gowning keeps the area sterile and protects both the product and the environment.',
+    question: 'Pressure gradients keep air flowing from cleaner to less clean areas.',
+    warn: 'Never enter before both checks are done.',
+    correct: 'Next: the controller basics, then the needle replacement on the filling line.',
+    controls: 'You’ll grip, turn and press parts on the filling line in flow 3.',
+  })[G.state] || 'Taking you to the filling line.';
+}
+function procRow(c, y, label, state, num) {
+  const cy = y + 16, done = state === 'done', on = state === 'on';
+  if (on) { rr(c, 24, y - 2, 472, 36, 12); c.fillStyle = hexA(C.accent, 0.12); c.fill(); }
+  c.beginPath(); c.arc(46, cy, 13, 0, Math.PI * 2);
+  if (done) { c.fillStyle = hexA(C.success, 0.18); c.fill(); c.strokeStyle = C.success; c.lineWidth = 2; c.stroke(); c.lineWidth = 2.5; c.beginPath(); c.moveTo(40, cy); c.lineTo(44.5, cy + 4.5); c.lineTo(52, cy - 4); c.stroke(); }
+  else if (on) { c.fillStyle = C.accent; c.fill(); c.fillStyle = C.panel; c.font = `700 13px ${FONT}`; c.textAlign = 'center'; c.fillText(String(num), 46, cy + 4.5); c.textAlign = 'left'; }
+  else { c.strokeStyle = C.border; c.lineWidth = 2; c.stroke(); c.fillStyle = C.text3; c.font = `600 13px ${FONT}`; c.textAlign = 'center'; c.fillText(String(num), 46, cy + 4.5); c.textAlign = 'left'; }
+  c.font = `${on ? 600 : 400} 18px ${FONT}`; c.fillStyle = on ? C.text1 : done ? C.text2 : C.text3; c.fillText(label, 72, cy + 6);
+}
+function procHeader(c, y, text) { c.font = `600 14px ${FONT}`; c.fillStyle = C.text3; c.letterSpacing = '1.5px'; c.fillText(text, 32, y + 14); c.letterSpacing = '0px'; }
+function drawProcGown() {
+  const p = proc, c = p.ctx; p.begin();
+  p.surface(0, 0, 520, 740, 28);
+  c.fillStyle = C.text1; c.font = `600 26px ${FONT}`; c.fillText('RABS gowning', 32, 56);
+  c.fillStyle = C.text3; c.font = `500 17px ${FONT}`; c.fillText('Flow 1 · gowning, then the entry check', 32, 84);
+  const picking = ['pick', 'error', 'detail'].includes(G.state), allOn = GSTEP[G.state] >= 4;
+  let y = 118; procHeader(c, y, 'GOWNING ORDER'); y += 30;
+  for (let k = 0; k < 6; k++) {
+    const done = allOn || k < G.k || (G.state === 'detail' && k === G.k);
+    const on = picking && k === G.k && !done;
+    procRow(c, y, done ? GOWN[k].name : on ? 'Next item' : `Item ${k + 1}`, done ? 'done' : on ? 'on' : 'todo', k + 1); y += 36;
+  }
+  y += 10; procHeader(c, y, 'ENTRY CHECK'); y += 30;
+  const eDone = ['correct', 'controls', 'loading', 'done'].includes(G.state), eOn = G.state === 'question' || G.state === 'warn';
+  procRow(c, y, 'Pressure and cleanliness grade', eDone ? 'done' : eOn ? 'on' : 'todo', 7); y += 46;
+  procHeader(c, y, 'NEXT'); y += 30;
+  procRow(c, y, 'Controller basics', G.state === 'loading' || G.state === 'done' ? 'done' : G.state === 'controls' ? 'on' : 'todo', 8); y += 36;
+  procRow(c, y, 'Needle replacement (flow 3)', G.state === 'loading' || G.state === 'done' ? 'on' : 'todo', 9);
+  c.font = `500 16px ${FONT}`; c.fillStyle = C.text3;
+  wrap(c, 'The donning order follows the redesign and needs SOP sign-off.', 456).forEach((l, k) => c.fillText(l, 32, 672 + k * 24));
+  p.end();
+}
+function setGown(state) { G.state = state; if (state !== 'pick') G.hint = null; setCues(); placeTask(false); redrawAll(); }
+function onGownObject(obj) {
+  const key = obj.userData.gownKey; if (!key || !(G.state === 'pick' || G.state === 'error')) return;
+  const next = GOWN[G.k];
+  if (key === next.key) {
+    pulseHaptics(1); resetIdle();
+    obj.userData.item = next; G.cur = obj; G.hint = null;
+    const vp = viewPos(), dir = BENCH_CENTER.clone().sub(vp).normalize();
+    const spot = vp.clone().addScaledVector(dir, 0.75); spot.y = vp.y - 0.3; // floats below the panel, above the bench
+    moveTo(obj, spot, 0.6);
+    setGown('detail'); speak(next.name + '. ' + next.why);
+    return;
+  }
+  S.stats.errors++; pulseHaptics(2);
+  if (S.assess) { redrawAll(); return; } // logged, not shown
+  G.err = GOWN.find(g => g.key === key).when;
+  setGown('error'); speak('Not yet. ' + G.err);
+}
+function onGownButton(id) {
+  switch (id) {
+    case 'g-start': setGown('pick'); speak(`Select the item you put on first.`); return true;
+    case 'g-retry': setGown('pick'); return true;
+    case 'g-gotit': {
+      const it = G.cur, vp = viewPos();
+      G.cur = null; G.k++; setGown(G.k >= 6 ? 'welldone' : 'pick'); // change state before anything redraws
+      showToast(`${it.userData.item.name} on`);
+      tween(0.45, e => { it.scale.setScalar(1 - e); it.position.lerp(vp, e * 0.15); }, () => { it.visible = false; it.scale.setScalar(1); });
+      return true;
+    }
+    case 'g-continue': setGown('question'); return true;
+    case 'g-yes': setGown('correct'); return true;
+    case 'g-notyet': S.stats.errors++; setGown('warn'); return true;
+    case 'g-again': setGown('question'); return true;
+    case 'g-back1': startGown(true); return true;
+    case 'g-next': setGown('controls'); return true;
+    case 'g-ctrl': G.loadT = 0; setGown('loading'); return true;
+    case 'showme': case 'h-showme':
+      if (G.state !== 'pick' || S.assess) return true;
+      S.stats.hints++; G.hint = gownItems.find(it => it.userData.gownKey === GOWN[G.k].key); setCues(); redrawAll(); return true;
+    case 'h-repeat': speak(G.state === 'pick' ? `Select the item you put on ${ORD[G.k]}.` : gownAbout()); return true;
+    case 'h-restart': startGown(true); return true;
+  }
+  return false;
+}
+function resetGownItems() {
+  gownItems.forEach(it => {
+    it.visible = true; it.scale.setScalar(1); it.position.copy(it.userData.home); it.rotation.set(0, Math.PI / 2, 0);
+    if (!it.userData.label) { // name tag above each item, as on the Figma item cards
+      const l = labelSprite(); l.setText(GOWN.find(g => g.key === it.userData.gownKey).name, C.borderStrong);
+      l.scale.set(0.22, 0.0385, 1); scene.add(l); it.userData.label = l;
+    }
+  });
+}
+function startGown(keepStats = false) {
+  tweens.length = 0;
+  S.flow = 1; S.finished = false; S.mode = 'task'; S.busy = false; S.err = null; S.prog = null; cueTone = 'task';
+  if (!keepStats) S.stats = { errors: 0, hints: 0, nudges: 0 };
+  Object.assign(G, { state: 'intro', k: 0, err: '', hint: null, cur: null, loadT: 0, demoErr: false, demoQ: false });
+  resetGownItems(); ghost.visible = false;
+  if (renderer.xr.isPresenting) { rig.position.set(GOWN_CAM.x, 0, GOWN_CAM.z); rig.rotation.y = Math.PI / 2; }
+  else { camera.position.copy(GOWN_CAM); controls.target.copy(GOWN_LOOK); controls.update(); }
+  placeSidePanels(1); setCues(); placeTask(true); redrawAll();
+}
+function enterCleanroom() { // end of flow 1: walk the trainee to the filling line and start flow 3
+  const fc = camera.position.clone(), ft = controls.target.clone();
+  restart(true);
+  if (renderer.xr.isPresenting) { rig.rotation.y = 0; rig.position.set(0, 0, START_CAM.z); }
+  else tween(1.6, e => { camera.position.lerpVectors(fc, START_CAM, e); controls.target.lerpVectors(ft, START_LOOK, e); });
+  placeSidePanels(3, 1.6);
+  speak(row().i);
+}
+function autoGown() {
+  switch (G.state) {
+    case 'intro': onGownButton('g-start'); break;
+    case 'pick':
+      if (!G.demoErr && G.k === 1) { G.demoErr = true; onGownObject(gownItems.find(it => it.userData.gownKey === 'gloves')); }
+      else onGownObject(gownItems.find(it => it.userData.gownKey === GOWN[G.k].key));
+      break;
+    case 'error': onGownButton('g-retry'); break;
+    case 'detail': onGownButton('g-gotit'); break;
+    case 'welldone': onGownButton('g-continue'); break;
+    case 'question': if (!G.demoQ) { G.demoQ = true; onGownButton('g-notyet'); } else onGownButton('g-yes'); break;
+    case 'warn': onGownButton('g-again'); break;
+    case 'correct': onGownButton('g-next'); break;
+    case 'controls': onGownButton('g-ctrl'); break;
+  }
+}
+
+// task panel placement: above the current target, nudged toward the viewer, facing them
+const panelGoal = new THREE.Vector3();
+function placeTask(snap) {
+  const r = row(), vp = viewPos();
+  let anchor;
+  if (S.finished) anchor = new THREE.Vector3(0, 1.3, -1.3);
+  else { const o = targetsFor(r.t)[0]; anchor = o ? boundsOf(o).center : new THREE.Vector3(0, 1.3, -1.3); }
+  // Step 1: the trainee is still at the door, so the panel waits close to them, above the path to the ring.
+  if (r.t === 'FloorZone' && !S.finished) anchor = new THREE.Vector3(0, 1.2, 1.05);
+  if (S.flow === 1) anchor = BENCH_CENTER.clone();
+  // Float the panel about 1.1 m from the viewer, on their line of sight to the target, raised so it sits
+  // just above the target in view: close enough to read, never covering the part they need to touch.
+  const toTarget = anchor.clone().sub(vp); const dist = toTarget.length(); toTarget.normalize();
+  const along = Math.min(1.1, Math.max(0.6, dist - 0.35));
+  panelGoal.copy(vp).addScaledVector(toTarget, along);
+  panelGoal.y = THREE.MathUtils.clamp(panelGoal.y + 0.36, 1.62, 2.12);
+  if (snap) taskGroup.position.copy(panelGoal);
+}
+function faceViewer(obj) {
+  const vp = viewPos(); const p = obj.getWorldPosition(new THREE.Vector3());
+  obj.rotation.set(0, Math.atan2(vp.x - p.x, vp.z - p.z), 0);
+  const dy = vp.y - p.y, d = Math.hypot(vp.x - p.x, vp.z - p.z); obj.rotateX(-Math.atan2(-dy, d) * 0.6);
+}
+
+// ------------------------------------------------------------------ picking (mouse/touch + XR controllers)
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+function pickFromRay() {
+  const targets = [...panels.filter(p => p.mesh.visible).map(p => p.mesh), ...pickables];
+  const hits = raycaster.intersectObjects(targets, true);
+  for (const h of hits) {
+    let o = h.object;
+    if (o.userData.panel) { const b = o.userData.panel.hitAt(h.uv); if (b) return { panel: o.userData.panel, button: b.id, point: h.point }; continue; }
+    while (o && !o.userData.pickable) o = o.parent;
+    if (o && o.visible) return { object: o, point: h.point };
+  }
+  return null;
+}
+let hovered = null;
+function setHover(hit) {
+  const obj = hit?.object || null;
+  if (hovered !== obj) {
+    if (hovered) hovered.traverse(m => { if (m.isMesh && m.userData.baseEmissive) m.material.emissive.copy(m.userData.baseEmissive); });
+    hovered = obj;
+    if (hovered && !S.busy) hovered.traverse(m => { if (m.isMesh && m.material.emissive) m.material.emissive.set('#1E7C7B'); });
+  }
+  for (const p of panels) {
+    const id = hit?.panel === p ? hit.button : null;
+    if (p.hover !== id) { p.hover = id; p.draw(); }
+  }
+  renderer.domElement.style.cursor = (obj || hit?.button) ? 'pointer' : 'grab';
+}
+function setRayFromPointer(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(pointer, camera);
+}
+let downAt = null;
+renderer.domElement.addEventListener('pointermove', e => { if (renderer.xr.isPresenting) return; setRayFromPointer(e); setHover(pickFromRay()); });
+renderer.domElement.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 6) { downAt = null; return; }
+  downAt = null; setRayFromPointer(e); handlePick(pickFromRay(), true);
+});
+function handlePick(hit, byUser) {
+  if (byUser && S.auto) setAuto(false);
+  if (!hit) return;
+  if (hit.panel) { if (hit.button) onButton(hit.button); return; }
+  if (hit.object) onObject(hit.object);
+}
+
+// XR controllers: a ray line on each, trigger = select; the hint pill rides on the left wrist
+const xrControllers = [];
+const tmpMat = new THREE.Matrix4();
+for (let k = 0; k < 2; k++) {
+  const ctrl = renderer.xr.getController(k); rig.add(ctrl);
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: C.focus }));
+  line.scale.z = 3; ctrl.add(line);
+  const grip = renderer.xr.getControllerGrip(k); rig.add(grip);
+  const body = new THREE.Mesh(new RoundedBoxGeometry(0.04, 0.03, 0.12, 2, 0.01), new THREE.MeshStandardMaterial({ color: '#1E293B' })); grip.add(body);
+  ctrl.addEventListener('selectstart', () => {
+    tmpMat.identity().extractRotation(ctrl.matrixWorld);
+    raycaster.ray.origin.setFromMatrixPosition(ctrl.matrixWorld);
+    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tmpMat);
+    handlePick(pickFromRay(), true);
+  });
+  ctrl.addEventListener('connected', e => { ctrl.userData.gamepad = e.data.gamepad; if (e.data.handedness === 'left') { grip.add(hint.mesh); hint.mesh.visible = true; hint.mesh.position.set(0, 0.07, 0.02); hint.mesh.rotation.set(-1.0, 0, 0); hint.mesh.scale.setScalar(0.5); } });
+  ctrl.addEventListener('disconnected', () => { if (hint.mesh.parent === grip) { taskGroup.add(hint.mesh); hint.mesh.visible = false; hint.mesh.rotation.set(0, 0, 0); hint.mesh.scale.setScalar(1); drawTask(); } });
+  xrControllers.push({ ctrl, line, grip });
+}
+function pulseHaptics(n) {
+  const session = renderer.xr.getSession?.(); if (!session) return;
+  for (const src of session.inputSources) { const a = src.gamepad?.hapticActuators?.[0]; try { a?.pulse?.(0.6, n > 1 ? 60 : 40); } catch (_) {} }
+}
+// In VR the camera lives inside the rig, so moving the rig moves the player.
+renderer.xr.addEventListener('sessionstart', () => {
+  rig.add(camera); camera.position.set(0, 0, 0);
+  if (S.flow === 1) { rig.position.set(GOWN_CAM.x, 0, GOWN_CAM.z); rig.rotation.y = Math.PI / 2; } // face the bench
+  else { rig.rotation.y = 0; rig.position.set(0, 0, S.i === 0 && !S.finished ? START_CAM.z : VR_STAND_Z); }
+  placeTask(true);
+});
+renderer.xr.addEventListener('sessionend', () => {
+  scene.add(camera); rig.position.set(0, 0, 0); rig.rotation.y = 0;
+  if (S.flow === 1) { camera.position.copy(GOWN_CAM); controls.target.copy(GOWN_LOOK); }
+  else { camera.position.copy(S.i === 0 ? START_CAM : STAND_CAM); controls.target.copy(S.i === 0 ? START_LOOK : STAND_LOOK); }
+  controls.update();
+});
+
+// ------------------------------------------------------------------ voice + HUD
+function speak(text) {
+  try { if (!('speechSynthesis' in window) || !text) return; speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 1.02; speechSynthesis.speak(u); } catch (_) {}
+}
+const btnAuto = document.getElementById('btn-auto'), btnAssess = document.getElementById('btn-assess');
+const btnFlow1 = document.getElementById('btn-flow1'), btnFlow3 = document.getElementById('btn-flow3');
+function syncHud() {
+  btnAuto.setAttribute('aria-pressed', String(S.auto)); btnAssess.setAttribute('aria-pressed', String(S.assess));
+  btnFlow1.setAttribute('aria-pressed', String(S.flow === 1)); btnFlow3.setAttribute('aria-pressed', String(S.flow === 3));
+  // collapsed card still says where the trainee is
+  const sub = document.getElementById('hud-sub');
+  if (sub) sub.textContent = S.flow === 1 ? 'Flow 1 · Gowning' : S.finished ? 'Flow 3 · Complete' : `Flow 3 · Step ${row().n} of 13`;
+}
+btnFlow1.addEventListener('click', () => { setAuto(false); startGown(); });
+btnFlow3.addEventListener('click', () => { setAuto(false); restart(); });
+function setAuto(on) { S.auto = on; autoT = 0; drawHelp(); syncHud(); }
+function setAssess(on) { S.assess = on; if (S.mode === 'nudge' || S.mode === 'demo') S.mode = 'task'; cueTone = 'task'; setCues(); redrawAll(); }
+btnAuto.addEventListener('click', () => setAuto(!S.auto));
+btnAssess.addEventListener('click', () => setAssess(!S.assess));
+document.getElementById('btn-restart').addEventListener('click', () => { setAuto(false); startGown(); });
+if ('xr' in navigator) {
+  navigator.xr.isSessionSupported('immersive-vr').then(ok => { if (ok) document.getElementById('vr-slot').appendChild(VRButton.createButton(renderer)); }).catch(() => {});
+}
+
+// auto-play: walks the whole flow, showing one error on each step that has one
+let autoT = 0;
+function autoStep() {
+  if (S.busy) return;
+  if (S.finished) { restart(); return; }
+  const r = row();
+  if (S.mode === 'progress') return;
+  if (S.mode === 'error' || S.mode === 'nudge' || S.mode === 'demo') { retry(); return; }
+  if (S.i === 0 && !S.demoErr) { S.demoErr = true; nudge(); return; }
+  if (r.e && !S.demoErr && r.c !== 'WaitForMachine') {
+    S.demoErr = true;
+    if (r.c === 'PickItem') onObject(packets[1]); else error(r.e, r.ed);
+    return;
+  }
+  const o = targetsFor(r.t)[0]; if (o) onObject(o);
+}
+
+// ------------------------------------------------------------------ loop
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  stepTweens(dt);
+  if (!renderer.xr.isPresenting) controls.update();
+  if (S.mode === 'progress' && S.prog) {
+    S.prog.t += dt; S.prog.p = Math.min(1, S.prog.t / S.prog.dur); drawTask();
+    if (S.prog.p >= 1) { const done = S.prog.onDone; S.prog = null; S.mode = 'task'; done(); }
+  }
+  if (S.toastUntil && !toastVisible()) { S.toastUntil = 0; drawToast(); drawTask(); }
+  if (S.flow === 3 && !S.auto && !S.assess && S.mode === 'task' && !S.busy && !S.finished) { idleTimer += dt; if (idleTimer > IDLE_SECONDS) { idleTimer = 0; nudge(); } }
+  if (S.auto) { autoT += dt; if (autoT > 2.2) { autoT = 0; if (S.flow === 1) autoGown(); else autoStep(); } }
+  if (S.flow === 1) {
+    if (G.state === 'loading') { G.loadT += dt; drawTask(); if (G.loadT >= 2.5) { G.state = 'done'; enterCleanroom(); } }
+    if (G.cur && G.state === 'detail') G.cur.rotation.y += dt * 0.8;
+  }
+  for (const it of gownItems) {
+    const l = it.userData.label; if (!l) continue;
+    l.visible = S.flow === 1 && it.visible && it !== G.cur && G.state !== 'loading';
+    if (l.visible) l.position.copy(it.userData.home).add(new THREE.Vector3(0, 0.15, 0));
+  }
+  // lazy-follow task panel
+  placeTask(false);
+  taskGroup.position.lerp(panelGoal, 1 - Math.pow(0.02, dt));
+  faceViewer(taskGroup);
+  updateCues(t);
+  zoneRing.material.opacity = 0.55 + 0.3 * Math.sin(t * 3);
+  // XR hover: first controller's ray
+  if (renderer.xr.isPresenting && xrControllers[0]) {
+    const c0 = xrControllers[xrControllers.length - 1].ctrl;
+    tmpMat.identity().extractRotation(c0.matrixWorld);
+    raycaster.ray.origin.setFromMatrixPosition(c0.matrixWorld);
+    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tmpMat);
+    setHover(pickFromRay());
+  }
+  renderer.render(scene, camera);
+});
+
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+// debugging hook (handy in the browser console)
+window.__f3 = { renderer, scene, camera, controls, S, G, restart, startGown, onObject, onButton, targetsFor, row, packets, gownItems, GOWN, setAssess, setAuto };
+
+// fonts first, so the canvas panels use Poppins
+Promise.race([Promise.all(['400 20px Poppins', '500 18px Poppins', '600 26px Poppins', '700 30px Poppins'].map(f => document.fonts.load(f))), new Promise(r => setTimeout(r, 2500))])
+  .finally(() => { document.getElementById('loading').hidden = true; startGown(); });
+</script>

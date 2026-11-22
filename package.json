@@ -1,0 +1,17 @@
+{
+  "name": "needle-change-xr-portfolio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Needle Change XR case study and interactive WebXR prototype",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "build": "node --check server.js",
+    "lint": "node --check server.js",
+    "test": "node --test server.test.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

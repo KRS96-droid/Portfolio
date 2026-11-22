@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>XR Design — Kush Perspective Design</title>
+  <meta name="description" content="Immersive simulation and spatial interaction design portfolio by Kushraj Rama Shetty, featuring the RABS needle change procedure interaction interface, Enterprise VR training, and UE5 XR projects.">
+  <meta property="og:title" content="XR Design — Kush Perspective Design">
+  <meta property="og:description" content="Immersive simulation and spatial interaction design portfolio, featuring the RABS needle change procedure interaction interface and live WebXR prototype.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Public+Sans:wght@400;500;600&display=swap">
+  <style>
+    :root {
+      --bg: #000000;
+      --surface: #0b0d10;
+      --surface-2: #12161c;
+      --text: #ffffff;
+      --text-muted: #c2cad4;
+      --text-quiet: #8d97a5;
+      --rule: rgba(255, 255, 255, 0.2);
+      --rule-soft: rgba(255, 255, 255, 0.1);
+      --cyan: #00f5ff;
+      --cyan-hover: #5cf9ff;
+      --cyan-ink: #000000;
+      --display: "Archivo", system-ui, -apple-system, sans-serif;
+      --body: "Public Sans", system-ui, -apple-system, sans-serif;
+      --container: 1220px;
+      color-scheme: dark;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--bg);
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--body);
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    img {
+      display: block;
+      max-width: 100%;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    a:focus-visible,
+    button:focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: var(--container);
+      margin: 0 auto;
+      padding-inline: clamp(20px, 4vw, 48px);
+    }
+
+    /* ── Header (strict 3-zone single row) ───────────────────────── */
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: rgba(0, 0, 0, 0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--rule-soft);
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      min-height: 76px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .brand img {
+      height: 36px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    .brand-fallback {
+      display: none;
+      font-family: var(--display);
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .brand.is-fallback .brand-fallback {
+      display: inline;
+    }
+
+    .primary-nav {
+      display: flex;
+      align-items: center;
+      gap: clamp(18px, 2.8vw, 38px);
+    }
+
+    .primary-nav a {
+      position: relative;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      color: var(--text-muted);
+      padding-block: 6px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: color 0.18s ease;
+    }
+
+    .primary-nav a:hover {
+      color: var(--text);
+    }
+
+    .primary-nav a[aria-current="page"] {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .primary-nav a[aria-current="page"]::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -2px;
+      height: 2px;
+      background: var(--cyan);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    .btn-contact {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 0 20px;
+      border: 1px solid var(--cyan);
+      border-radius: 6px;
+      color: var(--cyan);
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background-color 0.18s ease, color 0.18s ease;
+    }
+
+    .btn-contact:hover {
+      background: var(--cyan);
+      color: var(--cyan-ink);
+    }
+
+    .nav-toggle {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      background: transparent;
+      border: 1px solid var(--rule);
+      border-radius: 6px;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .mobile-drawer {
+      display: none;
+      border-top: 1px solid var(--rule-soft);
+      background: #050608;
+      padding: 16px clamp(20px, 4vw, 48px) 24px;
+    }
+
+    .mobile-drawer.is-open {
+      display: grid;
+      gap: 12px;
+    }
+
+    .mobile-drawer a {
+      display: block;
+      padding: 10px 0;
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--rule-soft);
+    }
+
+    .mobile-drawer a[aria-current="page"] {
+      color: var(--cyan);
+      font-weight: 600;
+    }
+
+    /* ── Hero Banner ─────────────────────────────────────────────── */
+    .hero {
+      position: relative;
+      min-height: clamp(320px, 44vh, 440px);
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      border-bottom: 1px solid var(--rule-soft);
+      background: #05080d;
+    }
+
+    .hero-media {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+    }
+
+    .hero-media img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center 42%;
+      opacity: 0.62;
+    }
+
+    .hero-media::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 50% 45%, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 0.78) 85%),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.42) 50%, rgba(0, 0, 0, 0.96) 100%);
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding-block: clamp(52px, 7vw, 88px);
+      max-width: 860px;
+      display: grid;
+      gap: 18px;
+      justify-items: center;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-family: var(--display);
+      font-weight: 800;
+      font-size: clamp(32px, 5vw, 56px);
+      line-height: 1.08;
+      letter-spacing: -0.02em;
+      text-wrap: balance;
+    }
+
+    .hero p {
+      margin: 0;
+      font-size: clamp(16px, 1.8vw, 19px);
+      line-height: 1.55;
+      color: #e4eaf2;
+      max-width: 58ch;
+      text-wrap: balance;
+    }
+
+    /* ── Projects Section ────────────────────────────────────────── */
+    .projects-section {
+      padding-block: clamp(56px, 7vw, 92px) clamp(72px, 9vw, 112px);
+    }
+
+    .section-head {
+      display: grid;
+      gap: 14px;
+      padding-bottom: clamp(36px, 5vw, 56px);
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-family: var(--display);
+      font-weight: 800;
+      font-size: clamp(28px, 3.8vw, 44px);
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      text-wrap: balance;
+    }
+
+    .section-head p {
+      margin: 0;
+      font-size: 17px;
+      line-height: 1.6;
+      color: var(--text-muted);
+      max-width: 64ch;
+    }
+
+    .project-list {
+      display: grid;
+    }
+
+    .project-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.38fr) minmax(0, 1fr);
+      gap: clamp(28px, 4.5vw, 56px);
+      align-items: stretch;
+      padding-block: clamp(44px, 5.5vw, 68px);
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .project-media-link {
+      display: block;
+      position: relative;
+      aspect-ratio: 16 / 10;
+      overflow: hidden;
+      border-radius: 6px;
+      background: var(--surface-2);
+      border: 1px solid var(--rule-soft);
+    }
+
+    .project-media-link img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.35s ease;
+    }
+
+    .project-media-link:hover img {
+      transform: scale(1.025);
+    }
+
+    .project-copy {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 24px;
+      min-width: 0;
+    }
+
+    .project-copy-main {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .project-meta {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      color: var(--text-quiet);
+    }
+
+    .project-copy h3 {
+      margin: 0;
+      font-family: var(--display);
+      font-weight: 800;
+      font-size: clamp(24px, 2.5vw, 32px);
+      line-height: 1.15;
+      letter-spacing: -0.015em;
+      text-wrap: balance;
+      color: var(--text);
+    }
+
+    .project-copy .project-desc {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.65;
+      color: var(--text-muted);
+      max-width: 52ch;
+    }
+
+    .project-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      padding-top: 4px;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 0 24px;
+      border-radius: 6px;
+      background: var(--cyan);
+      color: var(--cyan-ink);
+      font-family: var(--body);
+      font-size: 15px;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: background-color 0.18s ease, transform 0.15s ease;
+    }
+
+    .btn-primary:hover {
+      background: var(--cyan-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 0 20px;
+      border-radius: 6px;
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.32);
+      color: var(--text);
+      font-family: var(--body);
+      font-size: 15px;
+      font-weight: 500;
+      white-space: nowrap;
+      transition: border-color 0.18s ease, color 0.18s ease, transform 0.15s ease;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      transform: translateY(-1px);
+    }
+
+    /* ── Footer ──────────────────────────────────────────────────── */
+    .site-footer {
+      border-top: 1px solid var(--rule-soft);
+      padding-block: 36px 48px;
+      color: var(--text-quiet);
+      font-size: 14px;
+    }
+
+    .footer-inner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px 32px;
+    }
+
+    .footer-brand {
+      display: grid;
+      gap: 8px;
+      justify-items: start;
+    }
+
+    .footer-brand img {
+      height: 30px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    .footer-brand span {
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .footer-links a {
+      color: var(--text-muted);
+      transition: color 0.18s ease;
+    }
+
+    .footer-links a:hover {
+      color: var(--cyan);
+    }
+
+    /* ── Responsive ──────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .project-row {
+        grid-template-columns: 1fr;
+        gap: 24px;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .primary-nav {
+        display: none;
+      }
+
+      .nav-toggle {
+        display: inline-flex;
+      }
+
+      .btn-contact {
+        padding: 0 14px;
+        min-height: 38px;
+        font-size: 13px;
+      }
+
+      .brand img {
+        height: 30px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+      .project-media-link:hover img,
+      .btn-primary:hover,
+      .btn-secondary:hover { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="https://kushrajshetty96.wixsite.com/kushperspectivdesign" target="_blank" rel="noopener noreferrer" aria-label="Kush Perspective Design Home">
+        <img src="/assets/logo.png" alt="Kush Perspective Design" referrerpolicy="no-referrer" onerror="this.style.display='none'; this.parentElement.classList.add('is-fallback');">
+        <span class="brand-fallback">Kush Perspective Design</span>
+      </a>
+
+      <nav class="primary-nav" aria-label="Primary navigation">
+        <a href="https://kushrajshetty96.wixsite.com/kushperspectivdesign" target="_blank" rel="noopener noreferrer">Home</a>
+        <a href="https://kushrajshetty96.wixsite.com/kushperspectivdesign/game-design" target="_blank" rel="noopener noreferrer">Game Design</a>
+        <a href="/" aria-current="page">XR Design</a>
+        <a href="https://kushrajshetty96.wixsite.com/kushperspectivdesign/industrial-design" target="_blank" rel="noopener noreferrer">Industrial Design</a>
+      </nav>
+
+      <div class="header-actions">
+        <a class="btn-contact" href="mailto:kushrajshetty96@gmail.com">Contact</a>
+        <button class="nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="mobile-drawer" aria-label="Toggle navigation menu">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M3 5.5h14M3 10h14M3 14.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <nav class="mobile-drawer" id="mobile-drawer" aria-label="Mobile navigation">
+      <a href="https://kushrajshetty96.wixsite.com/kushperspectivdesign" target="_blank" rel="noopener noreferrer">Home</a>
+      <a href="https://kushrajshetty96.wixsite.com/kushperspectivdesign/game-design" target="_blank" rel="noopener noreferrer">Game Design</a>
+      <a href="/" aria-current="page">XR Design</a>
+      <a href="https://kushrajshetty96.wixsite.com/kushperspectivdesign/industrial-design" target="_blank" rel="noopener noreferrer">Industrial Design</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="xr-hero-heading">
+      <div class="hero-media" aria-hidden="true">
+        <img src="/assets/xr-hero.jpg" alt="" referrerpolicy="no-referrer" onerror="this.style.display='none'">
+      </div>
+      <div class="container hero-content">
+        <h1 id="xr-hero-heading">Immersive Simulation &amp; Interaction Design</h1>
+        <p>Bridging technical expertise and immersive storytelling to create engaging AR and VR experiences.</p>
+      </div>
+    </section>
+
+    <section class="projects-section" id="projects" aria-labelledby="projects-heading">
+      <div class="container">
+        <div class="section-head">
+          <h2 id="projects-heading">AR/VR Projects</h2>
+          <p>Selected spatial UX, industrial XR training, and interactive AR/VR experiences designed for real-world human workflows.</p>
+        </div>
+
+        <div class="project-list">
+          <article class="project-row" id="aseptic-equipment-training">
+            <a class="project-media-link" href="/case-study" aria-label="Read the Aseptic Equipment Training Industrial XR Experience case study">
+              <img src="/src/assets/images/aseptic_hero_environment_1795121124489.jpg" alt="Minimalist fictional pharmaceutical cleanroom training studio with a generic stainless-steel and glass aseptic barrier workstation" referrerpolicy="no-referrer">
+            </a>
+            <div class="project-copy">
+              <div class="project-copy-main">
+                <p class="project-meta">Industrial XR &middot; Spatial UX &middot; Unity Prototype &middot; Confidentiality-Safe Case Study</p>
+                <h3>Aseptic Equipment Training &mdash; Industrial XR Experience</h3>
+                <p class="project-desc">Designing a user-centred immersive training experience for complex pharmaceutical manufacturing workflows. Reframes multi-panel spatial clutter into an 8-stage user journey, focused single-card spatial UI, five-layer progressive guidance, and an interactive Unity XR prototype.</p>
+              </div>
+              <div class="project-actions">
+                <a class="btn-primary" href="/case-study">Read Case Study</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="project-row" id="enterprise-vr">
+            <a class="project-media-link" href="https://kushrajshetty96.wixsite.com/kushperspectivdesign/blank-1#Section" target="_blank" rel="noopener noreferrer" aria-label="Read more about Enterprise VR Training Simulation">
+              <img src="/assets/project-enterprise-vr.jpg" alt="Enterprise VR Training Simulation industrial operator workflow preview" loading="lazy" referrerpolicy="no-referrer">
+            </a>
+            <div class="project-copy">
+              <div class="project-copy-main">
+                <p class="project-meta">Enterprise VR &middot; Pharmaceutical Training &middot; Simulation</p>
+                <h3>Enterprise VR Training Simulation</h3>
+                <p class="project-desc">Contributed to a VR training simulation project for a leading global pharmaceutical company, creating immersive learning experiences designed to improve knowledge retention, engagement, and training effectiveness.</p>
+              </div>
+              <div class="project-actions">
+                <a class="btn-primary" href="https://kushrajshetty96.wixsite.com/kushperspectivdesign/blank-1#Section" target="_blank" rel="noopener noreferrer">Read More</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="project-row" id="beyond-the-walls">
+            <a class="project-media-link" href="https://kushrajshetty96.wixsite.com/kushperspectivdesign/blank-2#Section" target="_blank" rel="noopener noreferrer" aria-label="Read more about Beyond the Walls">
+              <img src="/assets/project-beyond-walls.jpg" alt="Beyond the Walls iOS AR mural storytelling experience" loading="lazy" referrerpolicy="no-referrer">
+            </a>
+            <div class="project-copy">
+              <div class="project-copy-main">
+                <p class="project-meta">iOS AR &middot; Unity &amp; ARKit &middot; Spatial Storytelling</p>
+                <h3>Beyond the Walls</h3>
+                <p class="project-desc">Beyond the Walls: Murals Alive is an internal iOS AR experience developed in Unity and ARKit that transforms office murals into interactive 3D storytelling experiences. By scanning murals with a mobile device, visitors can explore animated visualizations showcasing the company&rsquo;s history, innovation, and vision while blending traditional Indian heritage with modern XR technology.</p>
+              </div>
+              <div class="project-actions">
+                <a class="btn-primary" href="https://kushrajshetty96.wixsite.com/kushperspectivdesign/blank-2#Section" target="_blank" rel="noopener noreferrer">Read More</a>
+              </div>
+            </div>
+          </article>
+
+          <article class="project-row" id="ue5-digital-human">
+            <a class="project-media-link" href="https://kushrajshetty96.wixsite.com/kushperspectivdesign/blank-5" target="_blank" rel="noopener noreferrer" aria-label="Read more about UE5 Digital Human Narrative XR Experience">
+              <img src="/assets/project-digital-human.jpg" alt="UE5 Digital Human real-time narrative XR character scene" loading="lazy" referrerpolicy="no-referrer">
+            </a>
+            <div class="project-copy">
+              <div class="project-copy-main">
+                <p class="project-meta">Unreal Engine 5 &middot; MetaHuman &middot; Real-Time Narrative XR</p>
+                <h3>UE5 Digital Human &mdash; Narrative XR Experience</h3>
+                <p class="project-desc">A real-time narrative XR experience crafted with Unreal Engine 5 digital humans, exploring expressive gaze, spatial presence, and responsive interactive pacing inside a head-mounted display.</p>
+              </div>
+              <div class="project-actions">
+                <a class="btn-primary" href="https://kushrajshetty96.wixsite.com/kushperspectivdesign/blank-5" target="_blank" rel="noopener noreferrer">Read More</a>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <a class="footer-brand" href="https://kushrajshetty96.wixsite.com/kushperspectivdesign" target="_blank" rel="noopener noreferrer">
+        <img src="/assets/logo.png" alt="Kush Perspective Design" referrerpolicy="no-referrer" onerror="this.style.display='none'">
+        <span>Kushraj Rama Shetty</span>
+      </a>
+      <span>&copy; 2026 Kushraj Rama Shetty. All rights reserved.</span>
+      <div class="footer-links">
+        <a href="https://kushrajshetty96.wixsite.com/kushperspectivdesign/xr-design" target="_blank" rel="noopener noreferrer">Wix XR Design</a>
+        <a href="https://www.linkedin.com/in/kushraj-rama-shetty-8a1704173" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+        <a href="https://github.com/KRS96-droid" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="mailto:kushrajshetty96@gmail.com">Email</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    (() => {
+      const toggle = document.getElementById('nav-toggle');
+      const drawer = document.getElementById('mobile-drawer');
+      if (!toggle || !drawer) return;
+      toggle.addEventListener('click', () => {
+        const next = !drawer.classList.contains('is-open');
+        drawer.classList.toggle('is-open', next);
+        toggle.setAttribute('aria-expanded', String(next));
+      });
+    })();
+  </script>
+</body>
+</html>
